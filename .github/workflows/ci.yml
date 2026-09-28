@@ -8,6 +8,21 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: helpdesk
+          POSTGRES_PASSWORD: helpdesk
+          POSTGRES_DB: helpdesk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://helpdesk:helpdesk@localhost:5432/helpdesk
     defaults:
       run:
         working-directory: backend
@@ -29,6 +44,14 @@ jobs:
       - name: App imports without errors
         run: python -c "import main"
 
+      - name: Only one migration head allowed
+        run: test $(alembic heads | wc -l) -le 1
+
+      - name: Migrations run on an empty database
+        run: alembic upgrade head
+
+      - name: Models match migrations
+        run: alembic check
   frontend:
     runs-on: ubuntu-latest
     defaults:

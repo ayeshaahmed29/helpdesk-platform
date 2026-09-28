@@ -63,3 +63,22 @@
 **What happened:** I forgot to create a new branch and committed on main. Push failed because the branch name did not exist.
 **How I fixed it:** Created the branch from the current commit with `git checkout -b`, then moved local main back with `git branch -f main origin/main`.
 **What I learned:** Always run `git branch` before committing to check which branch I am on.
+
+## Day 1–2 (Ayesha)
+
+### Problem: Duplicated and broken backend/Dockerfile
+**What happened:** The Dockerfile content was pasted twice, and the first CMD line ran directly into a second FROM line with no line break, which would fail to parse.
+**How I fixed it:** Removed the duplicate block and kept a single clean Dockerfile.
+**What I learned:** Always rebuild and check the container after editing a Dockerfile, not just visually skim it.
+
+### Problem: ruff lint failures on the new migration and model files
+**Found by:** CI (GitHub Actions)
+**What happened:** Unsorted imports, old-style `Union[X, Y]` typing, an unsorted `__all__`, and two real `F821 Undefined name` errors from forward-referenced model names (`"User"` in organization.py, `"Organization"` in user.py).
+**How I fixed it:** Ran `ruff check . --fix` for the style issues, and added `TYPE_CHECKING`-guarded imports to resolve the undefined-name errors properly instead of suppressing them.
+**What I learned:** Pylance and ruff both flag string-based forward references as undefined unless you add a `TYPE_CHECKING` import block — it's a false alarm at runtime but a real lint error in CI.
+
+### Problem: ruff not found inside the backend container
+**Found by:** Ayesha
+**What happened:** ruff is only installed as a step in the CI workflow, not part of requirements.txt, so it wasn't available inside the locally running container.
+**How I fixed it:** Ran `pip install ruff` inside the running container to check locally before pushing.
+**What I learned:** A dev-only tool used in CI won't exist locally unless it's also in requirements.txt (or a separate dev requirements file) — worth adding later so lint can be checked locally without extra steps.

@@ -1,10 +1,15 @@
 import enum
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, ForeignKey, Enum
+from sqlalchemy import DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import Base  
+from database import Base
+
+if TYPE_CHECKING:
+    from models.organization import Organization
+
 
 class UserRole(str, enum.Enum):
     customer = "customer"

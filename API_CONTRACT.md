@@ -32,8 +32,13 @@ it should always reflect the current, real contract, not the original plan.
 
 ### 1. Ticket fields: `first_response_at` and `status`
 - **What:** Needed by the SLA background job to detect overdue tickets
-- **How:** [TBD — exact field names/types on the `tickets` table]
-- **Status:** Not yet implemented
+- **How:** Columns on the `tickets` table (model: `backend/models/ticket.py`, migration: `8d06c8dfcc8c`):
+  - `status`: `VARCHAR(20)`, not null, default `new`. Lowercase values: `new`, `open`, `pending`, `resolved`, `closed`. Indexed.
+  - `first_response_at`: `TIMESTAMP WITH TIME ZONE`, nullable. NULL means no agent has replied publicly yet.
+  - `created_at`: `TIMESTAMP WITH TIME ZONE`, not null, default `now()`. The SLA timer starts from here.
+  - `assignee_id`: `INTEGER`, nullable. Can be used to email the assigned agent.
+  - `organization_id`: `INTEGER`, not null, indexed. Plain integer for now, a foreign key to `organizations.id` will be added once that table is merged.
+- **Status:** Implemented (PR #15)
 
 ### 2. Ticket events (created, updated)
 - **What:** So the audit log can record ticket-related actions automatically

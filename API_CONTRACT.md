@@ -26,6 +26,42 @@ it should always reflect the current, real contract, not the original plan.
 - **How:** [TBD — e.g. `send_email(to, subject, body)`]
 - **Status:** Not yet implemented
 
+### 5. Signup endpoint
+- **What:** Creates a new organization (company) together with its first user, who becomes the `owner`. Every user and ticket belongs to an organization, so this is where an organization first exists.
+- **How:** `POST /auth/signup` (code: `backend/routers/auth.py`, schemas in `backend/schemas/auth.py`)
+  - Request body (JSON):
+```json
+    {
+      "organization_name": "FastMart",
+      "full_name": "Owner One",
+      "email": "owner@fastmart.com",
+      "password": "at-least-8-characters"
+    }
+```
+    - `organization_name`: 2–100 characters
+    - `full_name`: 1–100 characters
+    - `email`: valid email; stored lowercase, so `A@x.com` and `a@x.com` are the same account
+    - `password`: 8–128 characters; stored as an argon2 hash, never returned
+  - `201 Created` response:
+```json
+    {
+      "id": 1,
+      "email": "owner@fastmart.com",
+      "full_name": "Owner One",
+      "role": "owner",
+      "organization_id": 1,
+      "created_at": "2026-09-29T12:00:00Z"
+    }
+```
+  - Errors:
+    - `409 Conflict`: an account with this email already exists
+    - `422 Unprocessable Entity`: validation failed (bad email, short password, missing field)
+  - Notes:
+    - The role is not accepted from the client. The first user of a new organization is always `owner`.
+    - User roles are stored lowercase: `customer`, `agent`, `admin`, `owner`.
+    - No token is returned yet. Login and `GET /auth/me` (item 1) are separate issues.
+- **Status:** Implemented (issue #4)
+
 ---
 
 ## Saqeeba provides → Ayesha consumes

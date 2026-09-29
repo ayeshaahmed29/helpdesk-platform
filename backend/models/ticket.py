@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -14,9 +14,9 @@ class Ticket(Base):
     description: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), server_default="new", index=True)
     priority: Mapped[str] = mapped_column(String(20), server_default="normal")
-    organization_id: Mapped[int] = mapped_column(Integer, index=True)
-    requester_id: Mapped[int] = mapped_column(Integer)
-    assignee_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     first_response_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

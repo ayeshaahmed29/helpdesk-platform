@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -11,11 +13,13 @@ from security import hash_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+DbSession = Annotated[Session, Depends(get_db)]
+
 EMAIL_TAKEN = "An account with this email already exists"
 
 
 @router.post("/signup", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
-def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+def signup(payload: SignupRequest, db: DbSession):
     email = payload.email.lower()
 
     if db.scalar(select(User).where(User.email == email)) is not None:

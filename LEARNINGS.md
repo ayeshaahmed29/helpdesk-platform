@@ -156,3 +156,16 @@
 - Generic "Invalid email or password" for unknown email, wrong password and inactive user, plus a dummy hash check for unknown emails, avoids leaking which accounts exist.
 - Removing the fake auth breaks `Bearer fake-<id>`, so Saqeeba's local test users need real password hashes and a real token.
 - No migration was needed because the schema did not change.
+
+## CI failed after adding login: `KeyError: 'REDIS_URL'` in "App imports without errors" (issue #5)
+
+**What happened**
+- The login PR passed locally, but the backend CI job failed at the `python -c "import main"` step with `KeyError: 'REDIS_URL'`. Lint and dependency install passed. The later steps (migration head check, upgrade, `alembic check`) were skipped because that step failed.
+
+**Cause**
+- `core/token_denylist.py` reads `os.environ["REDIS_URL"]` and `security.py` reads `os.environ["JWT_SECRET"]` at import time.
+- Locally these come from `.env`, which is gitignored and so never reaches GitHub Actions. The CI runner had no such variables, so importing `main` crashed before the app even started.
+
+**Fix**
+- Added `JWT_SECRET`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` and `REDIS_URL` to the existing `env:` block of the backend job in `.github/workflows/ci.yml`, using dummy CI-only values (no real secrets).
+- A Redis service isn't needed in CI: `redis.Redis.from_url()` only connects when a command runs, and the import and migration steps never call Redis.

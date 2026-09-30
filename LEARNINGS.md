@@ -115,3 +115,44 @@
 **What happened:** Ayesha shared the auth contract (get_current_user returning a User, Bearer token, core/, routers/, schemas/). Her signup PR also created routers/ and schemas/.
 **What I did:** Followed the same names and waited for her PR to merge before adding my files to those folders.
 **What I learned:** Agreeing on names and folders early avoids rework and merge conflicts.
+
+## Day 3 (Ayesha)
+
+### Problem: ruff B008 failure in the signup endpoint
+**Found by:** CI (GitHub Actions)
+**What happened:** The backend CI job failed on `routers/auth.py` with `B008 Do not perform function call Depends in argument defaults`. I had written `db: Session = Depends(get_db)` as a default argument, and ruff flags any function call in a default value.
+**How I fixed it:** Switched to FastAPI's `Annotated` style and defined `DbSession = Annotated[Session, Depends(get_db)]` once at module level, so the endpoint takes `db: DbSession`. Behavior is identical and no lint rule is suppressed.
+**What I learned:** `Annotated` is the modern way to declare FastAPI dependencies and keeps ruff happy. Defining an alias once means later endpoints can reuse it, and the same pattern will work for `get_current_user`.
+
+### Problem: Pylance "Import pwdlib could not be resolved" in VS Code
+**Found by:** The Problems panel in VS Code
+**What happened:** `security.py` showed a squiggle under `from pwdlib import PasswordHash`, although the app ran fine. I had installed `pwdlib` only inside the Docker image, and Pylance checks imports against the Python interpreter selected in VS Code on my machine.
+**How I fixed it:** Confirmed the package exists where the app runs with `docker compose exec backend python -c "import pwdlib; print('ok')"`. To clear the warning locally, create a virtual environment in `backend/`, install `requirements.txt`, and select it as the VS Code interpreter.
+**What I learned:** VS Code warnings reflect the editor's Python environment, not the container's. Checking inside the container first tells you whether the problem is real or just cosmetic.
+
+## Day 4 (Ayesha)
+
+## Login/logout (issue #5): JWT auth with Redis denylist
+
+**What I did**
+- Added `POST /auth/login`, `POST /auth/logout` and `GET /auth/me`.
+- Chose JWT access tokens in the `Authorization: Bearer` header. Tokens carry `sub` (user id), `jti`, `iat` and `exp`. The role is deliberately not in the token; the user is loaded from the DB on every request, so a deactivated or demoted user loses access immediately.
+- Logout stores the token's `jti` in Redis with a TTL equal to the token's remaining lifetime, so a revoked token is rejected until it would have expired anyway.
+- Replaced the body of Saqeeba's fake `get_current_user` in `core/auth.py`, keeping its name and return type so her routes don't change. Split out `get_token_payload` so logout can reuse it.
+- Moved `DbSession` into `database.py` so `core/auth.py` and `routers/auth.py` can share it without a circular import.
+
+**Problems and fixes**
+1. **Didn't understand `algorithms=[...]` in `jwt.decode`.**
+   Cause: I didn't know why the allowed algorithms must be passed explicitly.
+   Fix: the JWT header is written by whoever creates the token, so a forged token could claim `alg: none` or a different algorithm. The server must decide the allowed list (`JWT_ALGORITHM`, default HS256) and never trust the token's own header.
+2. **Redis outage behaviour was undefined.**
+   Cause: an unreachable Redis raises `redis.exceptions.ConnectionError`, which would surface as a generic 500 and could hang without timeouts.
+   Fix: added 2-second connect/read timeouts and wrapped calls in `except redis.RedisError`, raising 503. This fails closed, so a possibly revoked token is never trusted. Login doesn't use Redis and keeps working.
+3. **Ruff reported 23 errors.**
+   Cause: 18 were `EXE002` (a Windows bind-mount artifact, not present in CI). The other 5 were real: unsorted imports (I001) in three files, plus unused `Session` and `get_db` imports (F401) in `routers/auth.py` left over after moving `DbSession`.
+   Fix: `--extend-ignore EXE002 --fix` resolved all 5. Reviewed `git diff` afterwards to confirm only imports changed.
+
+**Takeaways**
+- Generic "Invalid email or password" for unknown email, wrong password and inactive user, plus a dummy hash check for unknown emails, avoids leaking which accounts exist.
+- Removing the fake auth breaks `Bearer fake-<id>`, so Saqeeba's local test users need real password hashes and a real token.
+- No migration was needed because the schema did not change.

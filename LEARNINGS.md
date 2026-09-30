@@ -82,3 +82,36 @@
 **What happened:** ruff is only installed as a step in the CI workflow, not part of requirements.txt, so it wasn't available inside the locally running container.
 **How I fixed it:** Ran `pip install ruff` inside the running container to check locally before pushing.
 **What I learned:** A dev-only tool used in CI won't exist locally unless it's also in requirements.txt (or a separate dev requirements file) — worth adding later so lint can be checked locally without extra steps.
+
+## Day 3 (Saqeeba)
+
+### What I did
+- Linked tickets to organizations and users with foreign keys in a new migration (issue #19, PR #20). Tested upgrade, downgrade and upgrade again
+- Updated the Alembic migration template to the modern typing style, so new migrations pass ruff without manual fixes
+- Added a temporary fake get_current_user in core/auth.py (issue #12), following the structure agreed with Ayesha: same function name, returns a User, reads the Authorization: Bearer header
+- Added local test data: FastMart and QuickBank, with Ali (agent), Sara (agent) and Ahmed (customer)
+- Reviewed Ayesha's signup PR (#21) and tested it locally
+
+### Problem: Docker commands failed with "cannot find the file specified"
+**Found by:** Saqeeba
+**What happened:** `docker compose up` failed because Docker Desktop was not running.
+**How I fixed it:** Opened Docker Desktop, waited for "Engine running", then ran the command again.
+**What I learned:** Always start Docker Desktop before working on the project.
+
+### Problem: Alembic warned about unnamed foreign key constraints
+**Found by:** Saqeeba
+**What happened:** Autogenerate created foreign keys with the name None. The upgrade would work, but the downgrade would fail because it cannot drop a constraint without a name.
+**How I fixed it:** Gave each constraint a name in the migration (fk_tickets_organization_id, fk_tickets_requester_id, fk_tickets_assignee_id) and tested downgrade -1 and upgrade head.
+**What I learned:** Always test the downgrade of a migration, not only the upgrade. We will need it for rollbacks.
+
+### Problem: Raw SQL insert needed values that the models fill automatically
+**Found by:** Saqeeba
+**What happened:** The Organization and User models set created_at, role and is_active with Python defaults, not database defaults. Inserting rows directly with psql does not run those Python defaults.
+**How I fixed it:** Passed every required column explicitly in the INSERT statements.
+**What I learned:** A Python default (default=) only works when rows are created through SQLAlchemy. A database default (server_default=) works for any insert.
+
+### Note: Following the agreed structure
+**Found by:** Saqeeba
+**What happened:** Ayesha shared the auth contract (get_current_user returning a User, Bearer token, core/, routers/, schemas/). Her signup PR also created routers/ and schemas/.
+**What I did:** Followed the same names and waited for her PR to merge before adding my files to those folders.
+**What I learned:** Agreeing on names and folders early avoids rework and merge conflicts.

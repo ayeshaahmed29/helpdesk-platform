@@ -211,3 +211,23 @@
 - Cause: the backend didn't send `Access-Control-Allow-Origin`, so the browser blocked requests from `localhost:5173` to `localhost:8000`.
 - Fix: added `CORSMiddleware` allowing `http://localhost:5173` and `http://127.0.0.1:5173`.
 - Lesson: `localhost` and `127.0.0.1` are different origins, so list both. Avoid `allow_origins=["*"]` in an app with login.
+
+## Day 4 (Saqeeba)
+
+### What I did
+- Reviewed and tested Ayesha's login/logout PR (#5): login, /auth/me, logout, and the Redis outage returning 503
+- Gave the local test users real password hashes so they can log in with the real JWT auth
+- Built the tickets CRUD API (issue #10): create, list, get and update, scoped to the user's organization
+
+### Problem: Backend crashed after pulling the login PR (ERR_EMPTY_RESPONSE)
+**Found by:** Saqeeba
+**What happened:** security.py reads JWT_SECRET at import time, but my local .env was an old copy without it, so the app never started.
+**How I fixed it:** Compared my .env with .env.example, added the missing JWT variables, and recreated the container with `docker compose up -d --force-recreate backend`.
+**What I learned:** After pulling, compare .env with .env.example. Changing .env needs the container to be recreated, not just restarted.
+
+### Problem: Login returned 422 for the test users
+**Found by:** Saqeeba
+**What happened:** The test users had emails like ali@fastmart.test. The login schema uses email-validator, which rejects special-use domains such as .test.
+**How I fixed it:** Changed the test emails to .com addresses with an UPDATE query.
+**What I learned:** Read the 422 response body, it says exactly which field failed and why.
+

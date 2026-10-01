@@ -8,8 +8,18 @@ it should always reflect the current, real contract, not the original plan.
 
 ### 1. Current logged-in user + role
 - **What:** A way to get the currently authenticated user and their role (Customer / Agent / Admin / Owner)
-- **How:** [TBD — e.g. `GET /auth/me` returns `{ id, email, role, organization_id }`, or a dependency/middleware Saqeeba can import]
-- **Status:** Not yet implemented
+- **How:**
+  - **In backend code:** import `get_current_user` from `core.auth` and use it as a dependency:
+    `user: Annotated[User, Depends(get_current_user)]`. It returns the `User` model (with `id`, `email`, `role`, `organization_id`, `is_active`), or raises 401. Take `organization_id` and `requester_id` from this user, never from the request body, and filter every query by `user.organization_id`.
+  - **Over HTTP:** `GET /auth/me` returns `{ id, email, full_name, role, organization_id, created_at }`.
+  - **Auth flow:**
+    - `POST /auth/login` with `{ "email", "password" }` returns 200 `{ "access_token", "token_type": "bearer", "expires_in" }`. Bad credentials return 401 with the same message for all failures.
+    - Send the token on every request as `Authorization: Bearer <access_token>`.
+    - `POST /auth/logout` (needs the token) returns 204 and revokes that token immediately.
+  - **Token details:** JWT (HS256), expires after `ACCESS_TOKEN_EXPIRE_MINUTES` (default 60). The role is not in the token; the user is loaded from the DB on every request, and inactive users are rejected.
+  - **Errors:** 401 for missing, invalid, expired or revoked tokens. 503 if the token denylist (Redis) is unavailable.
+  - **Env vars needed:** `JWT_SECRET`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REDIS_URL` (see `.env.example`).
+- **Status:** Implemented (replaces the temporary fake `Bearer fake-<user_id>` auth) 
 
 ### 2. Permission check helper
 - **What:** A reusable function/dependency to check "does this user have permission to do X"

@@ -5,3 +5,5 @@ alembic
 psycopg[binary]
 pwdlib[argon2]
 email-validator
+pyjwt
+redis

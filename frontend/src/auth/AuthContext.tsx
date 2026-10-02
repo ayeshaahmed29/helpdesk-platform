@@ -1,22 +1,16 @@
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState,
+  useCallback, useEffect, useMemo, useState,
   type ReactNode,
 } from "react";
 import {
   ApiError, apiFetch, clearToken, getToken, setUnauthorizedHandler,
 } from "../api/client";
+import { AuthContext } from "./context";
 import type { CurrentUser } from "./types";
-
-type AuthContextValue = {
-  user: CurrentUser | null;
-  loading: boolean;
-  logout: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
+  // Starts false when there is no token, so no effect needs to reset it.
   const [loading, setLoading] = useState<boolean>(() => !!getToken());
 
   // Any 401 anywhere in the app drops the user, and the guard redirects.
@@ -26,10 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!getToken()) {
-      setLoading(false);
-      return;
-    }
+    if (!getToken()) return;
+
     apiFetch<CurrentUser>("/auth/me")
       .then(setUser)
       .catch((err) => {
@@ -51,10 +43,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ user, loading, logout }), [user, loading, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
-  return ctx;
 }

@@ -9,7 +9,7 @@ Priority = Literal["low", "normal", "high", "urgent"]
 class TicketCreate(BaseModel):
     subject: str = Field(min_length=1, max_length=255)
     description: str = Field(min_length=1)
-    priority: Priority = "normal"
+   
 
 
 class TicketUpdate(BaseModel):

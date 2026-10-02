@@ -41,6 +41,11 @@ def check_assignee(db: Session, user: User, assignee_id: int) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Tickets can only be assigned to staff",
         )
+    if not assignee.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot assign tickets to an inactive user",
+        )
 
 
 @router.post("", response_model=TicketRead, status_code=status.HTTP_201_CREATED)

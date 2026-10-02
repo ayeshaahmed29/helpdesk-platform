@@ -231,3 +231,26 @@
 **How I fixed it:** Changed the test emails to .com addresses with an UPDATE query.
 **What I learned:** Read the 422 response body, it says exactly which field failed and why.
 
+## Day 5 (Ayesha)
+
+### Issue #7, protected routes on the frontend
+
+### What I did
+- Added `AuthContext` (`frontend/src/auth/AuthContext.tsx`) so the layout and the route guard share one user from a single `GET /auth/me` call. It replaced the local `useCurrentUser` hook.
+- Added `ProtectedRoute`, which shows a loading state, then redirects to `/login` when there is no user (the original location is kept in `state.from`).
+- Handled 401 globally in `api/client.ts`. It now clears the token and calls a handler registered by `AuthContext`, instead of `window.location.assign("/login")`. The hard redirect reloaded the whole app and bypassed React Router, so the guard could not remember where the user was going.
+- Skipped the 401 handling when the request had no token, so a wrong password on login still shows its own error.
+- Wrapped the layout routes in the guard in `App.tsx`, and moved logout into `AuthContext`.
+- Rebased on main after reviewing Saqeeba's branch (no conflicts).
+- Updated `API_CONTRACT.md` with the frontend auth and route sections.
+
+### Problems and how I solved them
+1. **`npm run build` failed with ENOENT (package.json not found).** I ran it from the repo root. The frontend's `package.json` is in `frontend/`. Fix: `cd frontend` first. This is the same mistake that created the stray root `package-lock.json` earlier.
+2. **The frontend showed the Vite starter page even though `App.tsx` was correct.** I checked the wrong things first: the file contents, a stray local process on port 5173, and `wslrelay`. The real cause was in `docker compose logs frontend`: the container crashed on startup with `Cannot find module '@tailwindcss/oxide-linux-x64-gnu'`, because the `node_modules` volume was stale after switching branches and rebasing (same cause as the earlier Tailwind crash). Fix: `docker compose down`, `docker compose build --no-cache frontend`, then `docker compose up --renew-anon-volumes` (never `down -v`). Lesson: when the page looks wrong, read the container logs first.
+3. **Could not log in to test, because the login page is still a placeholder.** Swagger's Authorize button only affects the Swagger page, not the frontend. Fix: copy `access_token` from the `POST /auth/login` response, run `localStorage.setItem("token", "...")` in the browser console, then open a protected page like `/tickets` and refresh. `/login` never redirects, because it is outside the guard.
+4. **`/tickets` shows only a placeholder.** The ticket list UI belongs to Saqeeba's issue. Submitted tickets can be checked through Swagger (`GET /tickets`) until her page is merged.
+
+### Learned
+- Commit before switching branches (a WIP commit works), then check `git status` and `git diff main --stat` when you come back.
+- `AuthContext` has no `login()` or `refresh()` yet. The real login page issue must add one, so the user is set after a successful login.
+- The guard only checks that the user is logged in. Role checks stay in the backend.

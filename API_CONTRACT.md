@@ -72,6 +72,36 @@ it should always reflect the current, real contract, not the original plan.
     - No token is returned yet. Login and `GET /auth/me` (item 1) are separate issues.
 - **Status:** Implemented (issue #4)
 
+### 6. Frontend auth state (token, current user, 401 handling)
+- **What:** One shared place on the frontend for the token and the logged-in user, so pages never handle auth themselves.
+- **How:**
+  - **Token storage:** `localStorage`, key `"token"`. Do not read or write it directly in pages. Use `getToken`, `clearToken` and `TOKEN_KEY` from `frontend/src/api/client.ts`.
+  - **Making API calls:** always use `apiFetch<T>(path, options)` from `frontend/src/api/client.ts`. It adds the base URL (`VITE_API_URL`, default `http://localhost:8000`) and the `Authorization: Bearer` header. It throws `ApiError` (with `.status`) on non-2xx responses.
+  - **Current user in components:** `const { user, loading, logout } = useAuth()` from `frontend/src/auth/AuthContext.tsx`. `user` is `{ id, email, full_name?, role }` or `null`. `AuthProvider` (in `main.tsx`) calls `GET /auth/me` once when the app loads.
+  - **401 behavior:** if a request that sent a token gets a 401 (expired or revoked), `apiFetch` clears the token and `AuthContext` sets `user` to `null`. The route guard then redirects to `/login`. A 401 on a request with no token (for example a wrong password on login) is NOT treated as an expired session; the caller gets the normal `ApiError`.
+  - **Logout:** `logout()` calls `POST /auth/logout`, clears the token, and resets the user, even if the server call fails.
+- **Status:** Implemented (issue #7). Not yet available: a `login()` or `refresh()` function on `useAuth`, which the real login page (separate issue) will add.
+
+### 7. Frontend routes and protection
+- **What:** Which pages exist and which need a login.
+- **How:**
+  - Public: `/login` (placeholder for now). Unknown URLs show a NotFound page.
+  - Protected (redirect to `/login` when there is no valid user; the original location is passed as `state.from`): everything inside the shared layout.
+
+| Route | Sidebar visible to | Status |
+|---|---|---|
+| `/` | n/a | redirects to `/tickets` |
+| `/tickets` | agent, admin, owner | placeholder |
+| `/tickets/:id` | n/a (opened from lists) | placeholder |
+| `/portal` | customer | placeholder |
+| `/settings` | admin, owner | placeholder |
+| `/settings/team` | admin, owner | placeholder |
+| `/audit-log` | admin, owner | placeholder |
+
+  - The guard only checks that the user is logged in. It does not check roles; the sidebar only hides links by role (`frontend/src/layout/navConfig.ts`). The backend is what enforces permissions on every endpoint.
+  - To add a page: add the `<Route>` inside the protected layout block in `App.tsx`, and add one line to `NAV_ITEMS` in `navConfig.ts` if it needs a sidebar link.
+- **Status:** Implemented (issues #6 and #7)
+
 ---
 
 ## Saqeeba provides → Ayesha consumes
@@ -94,8 +124,8 @@ it should always reflect the current, real contract, not the original plan.
 
 ### 3. Ticket list UI
 - **What:** So audit log entries can link out to the relevant ticket
-- **How:** [TBD — e.g. frontend route pattern like `/tickets/:id`]
-- **Status:** Not yet implemented
+- **How:** Frontend route pattern `/tickets/:id` for a single ticket and `/tickets` for the list. Both routes already exist as placeholders inside the protected layout (see Ayesha item 7); Saqeeba replaces the placeholder `element` in `App.tsx` with the real pages.
+- **Status:** Routes reserved, UI not yet implemented
 
 ### 4. Comment-created event
 - **What:** So Ayesha's SLA job can mark when the first response happened

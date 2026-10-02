@@ -1,20 +1,15 @@
 import { Outlet, useNavigate } from "react-router-dom";
-import { apiFetch, clearToken } from "../api/client";
-import { useCurrentUser } from "../auth/useCurrentUser";
+import { useAuth } from "../auth/AuthContext";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 
 export default function Layout() {
-  const { user, loading } = useCurrentUser();
+  const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
 
   async function handleLogout() {
-    try {
-      await apiFetch("/auth/logout", { method: "POST" });
-    } catch {
-      // Clear the local token even if the server call fails.
-    }
-    clearToken();
+    // logout() calls the API, clears the token, and resets the shared user.
+    await logout();
     navigate("/login", { replace: true });
   }
 

@@ -19,6 +19,15 @@ export class ApiError extends Error {
   }
 }
 
+// AuthContext registers a callback here so a 401 anywhere in the app can
+// reset the user state. The route guard then redirects to /login, so this
+// file never needs to know about the router.
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
@@ -34,14 +43,12 @@ export async function apiFetch<T = unknown>(
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
 
   if (!response.ok) {
-    // Session expired or token revoked: clear it and send the user to login.
+    // Session expired or token revoked: clear it and tell the app.
     // Only when a token was sent, so a wrong password on the login request
     // (also a 401) still shows its normal error instead of redirecting.
     if (response.status === 401 && token) {
       clearToken();
-      if (window.location.pathname !== "/login") {
-        window.location.assign("/login");
-      }
+      onUnauthorized?.();
     }
     throw new ApiError(response.status, `Request failed: ${response.status}`);
   }

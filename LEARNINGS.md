@@ -169,3 +169,45 @@
 **Fix**
 - Added `JWT_SECRET`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` and `REDIS_URL` to the existing `env:` block of the backend job in `.github/workflows/ci.yml`, using dummy CI-only values (no real secrets).
 - A Redis service isn't needed in CI: `redis.Redis.from_url()` only connects when a command runs, and the import and migration steps never call Redis.
+
+## Day 5 (Ayesha)
+
+### Issue #6, shared frontend layout
+
+### What was done
+- Merged the login/logout/me PR into `main` and brought the `feature/6-shared-layout` branch up to date
+- Built the shared layout: sidebar, top bar, and a content area that renders pages through `<Outlet />`
+- Added a single nav config (`layout/navConfig.ts`) so each page is one line with allowed roles; Saqeeba adds her pages there
+- Added an API client that attaches the token, plus a hook that loads the current user from `GET /auth/me`
+- Added placeholder pages for all agreed routes (`/tickets`, `/tickets/:id`, `/portal`, `/settings`, `/settings/team`, `/audit-log`) and a 404 page
+- Set up Tailwind CSS v4, which was missing from the project
+- Removed the Vite starter page and its styles
+- Added CORS to the backend so the frontend can call the API
+- Left route guards and redirect-to-login for issue #7
+
+### Problems faced
+
+**1. VS Code error: "Cannot find module 'react-router-dom'"**
+- Cause: I installed the package inside the Docker container, but VS Code reads the local `node_modules` on Windows.
+- Fix: run `npm install` in the local `frontend` folder, then restart the TS server (`Ctrl+Shift+P` > "TypeScript: Restart TS Server").
+- Lesson: when adding an npm package, install it locally and rebuild the container.
+
+**2. Vite starter files broke the layout**
+- Cause: the default `App.tsx` and `index.css` style `#root` with a fixed width, borders, and centered text.
+- Fix: replaced `App.tsx`, reduced `index.css` to the Tailwind import, and deleted `App.css`.
+
+**3. Tailwind was in the tech stack but never installed**
+- Cause: it wasn't set up in the initial project scaffolding, so no `className` styling worked.
+- Fix: installed `tailwindcss` and `@tailwindcss/vite`, added the plugin to `vite.config.ts`, and imported Tailwind in `index.css`.
+- Lesson: check `package.json` against the agreed stack on Day 1.
+
+**4. Frontend container crashed: "Cannot find package '@tailwindcss/vite'"**
+- Cause: the container kept an old `node_modules` volume from before the package was added.
+- Fix: `docker compose down`, `docker compose build --no-cache frontend`, then `docker compose up --renew-anon-volumes`.
+- Warning: don't use `docker compose down -v`, because it also deletes the Postgres volume and the local data.
+- Lesson: after adding an npm dependency, everyone must rebuild and renew the anonymous volumes after pulling.
+
+**5. Browser CORS error on `/auth/me`**
+- Cause: the backend didn't send `Access-Control-Allow-Origin`, so the browser blocked requests from `localhost:5173` to `localhost:8000`.
+- Fix: added `CORSMiddleware` allowing `http://localhost:5173` and `http://127.0.0.1:5173`.
+- Lesson: `localhost` and `127.0.0.1` are different origins, so list both. Avoid `allow_origins=["*"]` in an app with login.

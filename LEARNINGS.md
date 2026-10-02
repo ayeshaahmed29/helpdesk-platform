@@ -254,3 +254,22 @@
 - Commit before switching branches (a WIP commit works), then check `git status` and `git diff main --stat` when you come back.
 - `AuthContext` has no `login()` or `refresh()` yet. The real login page issue must add one, so the user is set after a successful login.
 - The guard only checks that the user is logged in. Role checks stay in the backend.
+
+## Day 5 (Saqeeba)
+
+### What I did
+- Fixed the review comments on the tickets CRUD API (PR #25): removed priority from ticket creation, and blocked assigning tickets to inactive users
+- Resolved a merge conflict in LEARNINGS.md during rebase (both of us had added entries in the same place) by keeping both sections
+- Added filtering (status, priority, assignee_id) and pagination (page, page_size) to GET /tickets (issue #11)
+
+### Problem: ruff B008 on Query() defaults
+**Found by:** Saqeeba
+**What happened:** I wrote `page: int = Query(default=1, ge=1)`, and ruff flagged B008 because a function call was used as a default argument value.
+**How I fixed it:** Switched to the Annotated style, e.g. `page: Annotated[int, Query(ge=1)] = 1`, the same pattern Ayesha used for DbSession.
+**What I learned:** In FastAPI, put Query/Depends inside Annotated and keep the default as a plain value.
+
+### Problem: Teammate could not see my fix after a rebase
+**Found by:** Ayesha
+**What happened:** After I rebased and force-pushed my branch, the commit hashes changed, so Ayesha's local copy of the branch still had the old history.
+**How we fixed it:** She deleted her local branch and checked it out again from origin.
+**What I learned:** After a force-push, anyone with a local copy of that branch must re-fetch it. Tell the teammate when a branch was rebased.

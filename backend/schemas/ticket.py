@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Priority = Literal["low", "normal", "high", "urgent"]
-
+TicketStatus = Literal["new", "open", "pending", "resolved", "closed"]
 
 class TicketCreate(BaseModel):
     subject: str = Field(min_length=1, max_length=255)
@@ -33,3 +33,8 @@ class TicketRead(BaseModel):
     first_response_at: datetime | None
     created_at: datetime
     updated_at: datetime
+class TicketListResponse(BaseModel):
+    items: list[TicketRead]
+    total: int
+    page: int
+    page_size: int

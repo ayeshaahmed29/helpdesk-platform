@@ -3,6 +3,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./layout/Layout";
 import NotFound from "./pages/NotFound";
 import Placeholder from "./pages/Placeholder";
+import TicketList from "./pages/TicketList";
 
 export default function App() {
   return (
@@ -15,7 +16,7 @@ export default function App() {
         {/* Everything inside the shared layout. */}
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/tickets" replace />} />
-          <Route path="/tickets" element={<Placeholder title="Tickets" />} />
+          <Route path="/tickets" element={<TicketList />} />
           <Route path="/tickets/:id" element={<Placeholder title="Ticket detail" />} />
           <Route path="/portal" element={<Placeholder title="My tickets" />} />
           <Route path="/settings" element={<Placeholder title="Settings" />} />

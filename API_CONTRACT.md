@@ -119,20 +119,22 @@ it should always reflect the current, real contract, not the original plan.
 
 ### 2. Ticket events (created, updated)
 - **What:** So the audit log can record ticket-related actions automatically
-- **How:** [TBD — e.g. Saqeeba calls Ayesha's `log_audit_event()` helper directly from ticket endpoints, or emits an event Ayesha's code listens for]
-- **Status:** Not yet implemented
+- **How (planned):** Saqeeba calls Ayesha's `log_audit_event()` helper directly from the ticket endpoints.
+  - `action`: `ticket.created`, `ticket.updated`, `ticket.status_changed`
+  - `entity_type`: `ticket`
+  - `entity_id`: ticket id
+  - `metadata`: changed fields, e.g. `{ "status": ["new", "open"] }`
+- **Status:** Not yet implemented. Waiting for Ayesha's `log_audit_event()` helper.
 
 ### 3. Ticket list UI
 - **What:** So audit log entries can link out to the relevant ticket
-- **How:** Frontend route pattern `/tickets/:id` for a single ticket and `/tickets` for the list. Both routes already exist as placeholders inside the protected layout (see Ayesha item 7); Saqeeba replaces the placeholder `element` in `App.tsx` with the real pages.
-- **Status:** Routes reserved, UI not yet implemented
+- **How:** Frontend route pattern `/tickets/:id` for a single ticket and `/tickets` for the list. Both routes exist inside the protected layout (see Ayesha item 7); Saqeeba replaces the placeholder `element` in `App.tsx` with the real pages.
+- **Status:** Ticket list page implemented at `/tickets` (issue #13). The detail page at `/tickets/:id` is still a placeholder and comes in Week 2.
 
 ### 4. Comment-created event
 - **What:** So Ayesha's SLA job can mark when the first response happened
-- **How:** [TBD — likely tied to #1 above, whatever sets `first_response_at`]
-- **Status:** Not yet implemented
-
----
+- **How (planned):** No separate event. When an agent, admin or owner posts the first public reply, the comment endpoint sets `first_response_at` to the current time if it is still NULL. Internal notes and customer comments do not count. The SLA job only reads `first_response_at`.
+- **Status:** Not yet implemented (comments are a Week 2 task)
 
 ### 5. Tickets API
 - **What:** Endpoints for creating, listing, reading and updating tickets. All require the Bearer token.
@@ -142,9 +144,6 @@ it should always reflect the current, real contract, not the original plan.
   - `GET /tickets/{id}`: returns one ticket, or 404 if it does not exist or belongs to another organization.
   - `PATCH /tickets/{id}`: body can include `subject`, `description`, `priority`, `assignee_id`. Assignee must be an active staff user in the same organization (400 otherwise). Customers cannot assign (403).
   - Customers only see tickets they created.
-- **Status:** Implemented (CRUD in PR #25, filtering and pagination in #11)
+- **Status:** Implemented (CRUD in PR #25, filtering and pagination in #27)
 
-## Notes
-- If the other person's piece isn't ready yet, mock/stub it and replace later — this is normal.
-- Update the "Status" and "How" fields as real implementations land, so this file always
-  reflects reality, not just the plan.
+---

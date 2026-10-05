@@ -90,7 +90,7 @@ def list_tickets(
     total = db.scalar(select(func.count()).select_from(query.subquery()))
 
     items = db.scalars(
-        query.order_by(Ticket.created_at.desc())
+         query.order_by(Ticket.created_at.desc(), Ticket.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()

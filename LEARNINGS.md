@@ -273,3 +273,30 @@
 **What happened:** After I rebased and force-pushed my branch, the commit hashes changed, so Ayesha's local copy of the branch still had the old history.
 **How we fixed it:** She deleted her local branch and checked it out again from origin.
 **What I learned:** After a force-push, anyone with a local copy of that branch must re-fetch it. Tell the teammate when a branch was rebased.
+
+
+## Day 6 (Saqeeba)
+
+### What I did
+- Built the ticket list page (issue #13): table with status badges, status and priority filters, Previous/Next pagination, loading, error and empty states
+- Added api/tickets.ts with the Ticket types and listTickets(), so the page does not build URLs itself
+- Replaced the /tickets placeholder in App.tsx with the real page, inside Ayesha's layout and ProtectedRoute
+- Tested as Ali (agent), Sara (other organization, sees nothing) and Ahmed (customer, sees only his own ticket)
+
+### Problem: Hundreds of red errors in VS Code, but the Docker build passed
+**Found by:** Saqeeba
+**What happened:** VS Code showed errors on every JSX line. My local npm is broken, so VS Code reads an outdated local node_modules, while the app runs inside Docker.
+**How I fixed it:** Checked with `docker compose exec frontend npm run build` and `npm run lint`, which both passed, so the code was fine and the squiggles were only an editor problem.
+**What I learned:** Trust the build and lint output from the container, not the editor squiggles, when the local environment is different.
+
+### Problem: Changing PAGE_SIZE did not show up in the browser
+**Found by:** Saqeeba
+**What happened:** I set PAGE_SIZE to 1 to test pagination, but the page still showed 3 rows. `grep` inside the container showed the new value, so the file had arrived, but Vite did not reload it.
+**How I fixed it:** `docker compose restart frontend`, then a hard refresh (Ctrl + Shift + R).
+**What I learned:** On Windows, Docker bind mounts sometimes miss file changes. Check the file inside the container with grep, then restart.
+
+### Problem: Rebase conflict in LEARNINGS.md again
+**Found by:** Saqeeba
+**What happened:** Both of us appended entries at the end of LEARNINGS.md on different branches.
+**How I fixed it:** Kept both sections with "Accept Both Changes", then `git add` and `git rebase --continue`.
+**What I learned:** Conflicts in a shared log file are normal. Keep both sides and check that no conflict markers are left.

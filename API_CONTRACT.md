@@ -134,6 +134,16 @@ it should always reflect the current, real contract, not the original plan.
 
 ---
 
+### 5. Tickets API
+- **What:** Endpoints for creating, listing, reading and updating tickets. All require the Bearer token.
+- **How:**
+  - `POST /tickets`: body `{ subject, description }`. Priority always starts as `normal`; `organization_id` and `requester_id` come from the current user.
+  - `GET /tickets`: optional query params `status`, `priority`, `assignee_id`, plus `page` (default 1) and `page_size` (default 20, max 100). Returns `{ items, total, page, page_size }`.
+  - `GET /tickets/{id}`: returns one ticket, or 404 if it does not exist or belongs to another organization.
+  - `PATCH /tickets/{id}`: body can include `subject`, `description`, `priority`, `assignee_id`. Assignee must be an active staff user in the same organization (400 otherwise). Customers cannot assign (403).
+  - Customers only see tickets they created.
+- **Status:** Implemented (CRUD in PR #25, filtering and pagination in #11)
+
 ## Notes
 - If the other person's piece isn't ready yet, mock/stub it and replace later — this is normal.
 - Update the "Status" and "How" fields as real implementations land, so this file always

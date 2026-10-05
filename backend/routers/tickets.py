@@ -1,14 +1,21 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import Select, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user
 from database import DbSession
 from models import Ticket, User
 from models.user import UserRole
-from schemas.ticket import TicketCreate, TicketRead, TicketUpdate
+from schemas.ticket import (
+    Priority,
+    TicketCreate,
+    TicketListResponse,
+    TicketRead,
+    TicketStatus,
+    TicketUpdate,
+)
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -61,11 +68,34 @@ def create_ticket(payload: TicketCreate, db: DbSession, user: CurrentUser):
     return ticket
 
 
-@router.get("", response_model=list[TicketRead])
-def list_tickets(db: DbSession, user: CurrentUser):
-    query = visible_tickets(user).order_by(Ticket.created_at.desc())
-    return db.scalars(query).all()
+@router.get("", response_model=TicketListResponse)
+def list_tickets(
+    db: DbSession,
+    user: CurrentUser,
+    status_filter: Annotated[TicketStatus | None, Query(alias="status")] = None,
+    priority: Priority | None = None,
+    assignee_id: int | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+):
+    query = visible_tickets(user)
 
+    if status_filter is not None:
+        query = query.where(Ticket.status == status_filter)
+    if priority is not None:
+        query = query.where(Ticket.priority == priority)
+    if assignee_id is not None:
+        query = query.where(Ticket.assignee_id == assignee_id)
+
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+
+    items = db.scalars(
+         query.order_by(Ticket.created_at.desc(), Ticket.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+
+    return TicketListResponse(items=items, total=total, page=page, page_size=page_size)
 
 @router.get("/{ticket_id}", response_model=TicketRead)
 def get_ticket(ticket_id: int, db: DbSession, user: CurrentUser):

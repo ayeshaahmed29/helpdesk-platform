@@ -7,3 +7,5 @@ pwdlib[argon2]
 email-validator
 pyjwt
 redis
+pytest
+httpx

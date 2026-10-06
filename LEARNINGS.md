@@ -327,3 +327,25 @@
 - Return 404, not 403, for another company's records, so one company cannot learn what exists in another.
 - Check that CI really runs the tests, not only that they pass locally.
 - Local tools (Windows) and container tools (Linux) are different environments, so the same command can behave differently in each.
+
+## Day 7 (Saqeeba)
+
+### What I did
+- Issue #36: status workflow. Added a TRANSITIONS map and check_status_change() in routers/tickets.py, and a status field in TicketUpdate.
+- Tested in Swagger as Ali (new -> closed 400, new -> open 200, open -> pending 200, pending -> closed 400) and as Ahmed (customer, new -> open 403).
+
+### Problem: status check did not run
+**Found by:** Saqeeba (Swagger returned 200 for new -> closed)
+**What happened:** I pasted the status check two levels indented, so it ended up inside the `if "assignee_id" in changes:` block and only ran when assignee_id was also in the request.
+**How I fixed it:** Moved the check out to the function level, same indentation as the `for` loop.
+**What I learned:** In Python, indentation is the logic. Always test the negative case (the request that should fail), not only the happy path.
+
+### Problem: Swagger kept saying "Not authenticated"
+**Found by:** Saqeeba
+**What happened:** After login I pasted the token but did not press the Authorize button, and a page refresh also clears the token.
+**How I fixed it:** Login, copy access_token, Authorize, paste, press Authorize, Close. The lock icons turn solid when it worked.
+**What I learned:** Check the lock icons before testing. The real result is under "Server response", the "Responses" section below it is only documentation.
+
+### Learned
+- Keeping the allowed transitions in one dict makes the rule easy to read and change. The same map can be sent to the frontend so the status dropdown only shows valid next statuses.
+- No migration was needed because the model did not change, only the validation.

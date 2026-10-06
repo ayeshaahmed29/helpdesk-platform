@@ -17,6 +17,7 @@ class TicketUpdate(BaseModel):
     description: str | None = Field(default=None, min_length=1)
     priority: Priority | None = None
     assignee_id: int | None = None
+    status: TicketStatus | None = None
 
 
 class TicketRead(BaseModel):

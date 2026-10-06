@@ -300,3 +300,30 @@
 **What happened:** Both of us appended entries at the end of LEARNINGS.md on different branches.
 **How I fixed it:** Kept both sections with "Accept Both Changes", then `git add` and `git rebase --continue`.
 **What I learned:** Conflicts in a shared log file are normal. Keep both sides and check that no conflict markers are left.
+
+## Day 6 (Ayesha)
+
+## Issue #29, role permission helper and tenant isolation tests
+
+### What I did
+- Added `core/permissions.py` with `require_role(*roles)` (403 for a wrong role) and `ensure_same_org()` (404 for another company's record), plus the role groups `STAFF_ROLES` and `MANAGER_ROLES`.
+- Checked every existing endpoint (auth and tickets). They already depend on `get_current_user` and filter by `organization_id` (`visible_tickets()` in `routers/tickets.py`), so I made no router changes and avoided touching Saqeeba's code.
+- Set up pytest: added `pytest` and `httpx` to `requirements.txt`, added `backend/pytest.ini`, and added a `Tests` step to the backend job in `ci.yml`.
+- Added a test database fixture (`tests/conftest.py`). Tests use a separate `helpdesk_test` database, so dev data is never touched, and tables are emptied after every test. `get_current_user` is replaced in tests, so no Redis or real login is needed.
+- Wrote tenant isolation tests: company A cannot read or change company B's tickets, customers only see their own tickets, customers cannot assign tickets, assignees must be staff in the same company, and the organization in a create payload is ignored.
+- Documented the helper and an endpoint/role table in `API_CONTRACT.md`.
+
+### Problems and fixes
+1. **`pytest: executable file not found` in the container.** pytest was not in `requirements.txt`. Fix: add `pytest` and `httpx`, then `docker compose build backend` and `docker compose up -d`.
+2. **`ModuleNotFoundError: No module named 'core'`.** pytest only added the `tests` folder to the Python path, not the backend folder. Fix: `pythonpath = .` in `backend/pytest.ini`.
+3. **`ruff: executable file not found` in the container.** CI installs ruff with a separate `pip install ruff`, so it was never in the image. Fix: `docker compose exec backend pip install ruff` (it disappears after a rebuild).
+4. **`EXE002` on every file when running ruff locally.** The Windows folder is mounted into the Linux container and every file looks executable. It is not a real error and it does not appear in CI. Fix: run `ruff check . --ignore EXE002` locally.
+5. **`B008` on `Depends(...)` in default arguments in the test file.** Fix: declare the dependencies once with `Annotated[User, Depends(...)]`, the same style as `core/auth.py`.
+6. **CI did not run the tests at all.** The backend job only had lint, import and migration checks. Fix: added a `Tests` step (`pytest -v`).
+7. **Pylance warnings in VS Code ("Import could not be resolved").** VS Code checks the Python on Windows, but the packages are installed only in the Docker container. It is not a code problem. Fix: a local virtual environment (`backend/.venv`, ignored in git) selected as the interpreter, or ignore the warnings.
+
+### Lessons
+- Read the existing code before changing it. The routers were already safe, so the useful work was proving it with tests.
+- Return 404, not 403, for another company's records, so one company cannot learn what exists in another.
+- Check that CI really runs the tests, not only that they pass locally.
+- Local tools (Windows) and container tools (Linux) are different environments, so the same command can behave differently in each.

@@ -22,9 +22,48 @@ it should always reflect the current, real contract, not the original plan.
 - **Status:** Implemented (replaces the temporary fake `Bearer fake-<user_id>` auth) 
 
 ### 2. Permission check helper
-- **What:** A reusable function/dependency to check "does this user have permission to do X"
-- **How:** [TBD — e.g. `require_role(["agent", "admin", "owner"])` as a FastAPI dependency]
-- **Status:** Not yet implemented
+- **What:** Reusable checks for "is this role allowed to call this endpoint" and "does this record belong to the user's company".
+- **How:** Code: `backend/core/permissions.py`.
+  - `require_role(*roles)`: FastAPI dependency. It returns the current user, or raises **403** if the user's role is not in the list. A missing, invalid or revoked token is still **401** (from `get_current_user`, which it uses internally).
+  - `ensure_same_org(user, resource_org_id)`: raises **404** if a record belongs to another company. It is 404 and not 403 so that company A cannot find out whether company B's record exists.
+  - Role groups: `STAFF_ROLES` = agent, admin, owner. `MANAGER_ROLES` = admin, owner. Roles are the `UserRole` enum from `models.user`.
+  - Usage (declare the dependency with `Annotated`, because `Depends(...)` in a default argument fails the ruff `B008` rule):
+```python
+    from typing import Annotated
+
+    from fastapi import Depends
+
+    from core.permissions import MANAGER_ROLES, STAFF_ROLES, require_role
+    from models import User
+
+    StaffUser = Annotated[User, Depends(require_role(*STAFF_ROLES))]
+    ManagerUser = Annotated[User, Depends(require_role(*MANAGER_ROLES))]
+
+    @router.get("/something")
+    def something(user: StaffUser):
+        ...
+```
+  - **Rules for every endpoint:**
+    - Every endpoint must depend on `get_current_user` (directly or through `require_role`), unless it is public on purpose (see table).
+    - Every query must filter by `user.organization_id`. In `routers/tickets.py` this is done by `visible_tickets(user)`; use it or an equivalent for any new query.
+    - Use `require_role` when an endpoint is limited to some roles (for example invites and the audit log viewer are admin/owner only).
+    - Permissions are enforced in the backend. The frontend only hides links.
+  - **Endpoint and role table (current state):**
+
+| Endpoint | Who can call it | Notes |
+|---|---|---|
+| `GET /health` | public | health check |
+| `POST /auth/signup` | public | creates an organization and its first user (owner) |
+| `POST /auth/login` | public | same 401 message for every failure |
+| `POST /auth/logout` | any logged-in user | revokes the token |
+| `GET /auth/me` | any logged-in user | returns the current user |
+| `POST /tickets` | any logged-in user | `organization_id` and `requester_id` come from the current user, never from the body |
+| `GET /tickets` | staff: all tickets in their company. Customer: only their own | other companies' tickets are never returned |
+| `GET /tickets/{id}` | staff: any ticket in their company. Customer: only their own | 404 for a ticket in another company or another customer's ticket |
+| `PATCH /tickets/{id}` | staff: any ticket in their company. Customer: only their own | customers cannot set `assignee_id` (403); the assignee must be active staff in the same company (400) |
+
+  - **Tests:** `backend/tests/test_permissions.py` tests the helpers. `backend/tests/test_tenant_isolation.py` proves that company A cannot read or change company B's tickets, and that customers only see their own tickets. Run them with `docker compose exec backend pytest -v`. Tests use a separate `helpdesk_test` database and replace `get_current_user`, so they need neither Redis nor a real login (fixtures are in `backend/tests/conftest.py`).
+- **Status:** Implemented (issue #29)
 
 ### 3. Audit log helper function
 - **What:** A function Saqeeba's ticket code can call to record an action (e.g. "ticket created," "ticket updated")

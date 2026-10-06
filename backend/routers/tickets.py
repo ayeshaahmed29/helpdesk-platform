@@ -132,14 +132,24 @@ def update_ticket(ticket_id: int, payload: TicketUpdate, db: DbSession, user: Cu
     ticket = get_ticket_or_404(db, user, ticket_id)
     changes = payload.model_dump(exclude_unset=True)
 
-    if "assignee_id" in changes:
-        if user.role == UserRole.customer:
+    if user.role == UserRole.customer:
+        if "assignee_id" in changes:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Customers cannot assign tickets",
             )
-        if changes["assignee_id"] is not None:
-            check_assignee(db, user, changes["assignee_id"])
+        if "priority" in changes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Customers cannot change priority",
+            )
+        if ("subject" in changes or "description" in changes) and ticket.status != "new":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Customers can only edit a ticket while it is new",
+            )
+    elif "assignee_id" in changes and changes["assignee_id"] is not None:
+        check_assignee(db, user, changes["assignee_id"])
 
     if "status" in changes:
         check_status_change(user, ticket.status, changes["status"])

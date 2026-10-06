@@ -184,5 +184,13 @@ it should always reflect the current, real contract, not the original plan.
   - `PATCH /tickets/{id}`: body can include `subject`, `description`, `priority`, `assignee_id`. Assignee must be an active staff user in the same organization (400 otherwise). Customers cannot assign (403).
   - Customers only see tickets they created.
 - **Status:** Implemented (CRUD in PR #25, filtering and pagination in #27)
+## Status transitions (enforced in PATCH /tickets/{id}):
+- new -> open
+- open -> pending, resolved
+- pending -> open, resolved
+- resolved -> closed, open (reopen)
+- closed -> open (staff only)
+Any other change returns 400. Customers can only reopen (resolved -> open); other status changes by a customer return 403.
+## Customer rules for PATCH /tickets/{id}: own tickets only; cannot change assignee_id or priority (403); can edit subject/description only while status is new (403 otherwise); status changes limited to reopen (resolved -> open).
 
 ---

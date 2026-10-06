@@ -22,6 +22,31 @@ router = APIRouter(prefix="/tickets", tags=["tickets"])
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+# Allowed status transitions: current status -> statuses it can move to
+TRANSITIONS: dict[str, set[str]] = {
+    "new": {"open"},
+    "open": {"pending", "resolved"},
+    "pending": {"open", "resolved"},
+    "resolved": {"closed", "open"},
+    "closed": {"open"},
+}
+
+
+def check_status_change(user: User, current: str, new: str) -> None:
+    if new == current:
+        return
+    if new not in TRANSITIONS.get(current, set()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot change status from '{current}' to '{new}'",
+        )
+    if user.role == UserRole.customer and not (current == "resolved" and new == "open"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customers can only reopen resolved tickets",
+        )
+
+
 def visible_tickets(user: User) -> Select:
     query = select(Ticket).where(Ticket.organization_id == user.organization_id)
     if user.role == UserRole.customer:
@@ -90,7 +115,7 @@ def list_tickets(
     total = db.scalar(select(func.count()).select_from(query.subquery()))
 
     items = db.scalars(
-         query.order_by(Ticket.created_at.desc(), Ticket.id.desc())
+        query.order_by(Ticket.created_at.desc(), Ticket.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
@@ -107,14 +132,27 @@ def update_ticket(ticket_id: int, payload: TicketUpdate, db: DbSession, user: Cu
     ticket = get_ticket_or_404(db, user, ticket_id)
     changes = payload.model_dump(exclude_unset=True)
 
-    if "assignee_id" in changes:
-        if user.role == UserRole.customer:
+    if user.role == UserRole.customer:
+        if "assignee_id" in changes:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Customers cannot assign tickets",
             )
-        if changes["assignee_id"] is not None:
-            check_assignee(db, user, changes["assignee_id"])
+        if "priority" in changes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Customers cannot change priority",
+            )
+        if ("subject" in changes or "description" in changes) and ticket.status != "new":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Customers can only edit a ticket while it is new",
+            )
+    elif "assignee_id" in changes and changes["assignee_id"] is not None:
+        check_assignee(db, user, changes["assignee_id"])
+
+    if "status" in changes:
+        check_status_change(user, ticket.status, changes["status"])
 
     for field, value in changes.items():
         setattr(ticket, field, value)

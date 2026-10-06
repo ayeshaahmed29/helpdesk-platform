@@ -349,3 +349,8 @@
 ### Learned
 - Keeping the allowed transitions in one dict makes the rule easy to read and change. The same map can be sent to the frontend so the status dropdown only shows valid next statuses.
 - No migration was needed because the model did not change, only the validation.
+### Problem: customer could change priority through PATCH
+**Found by:** Ayesha (review question on PR #36)
+**What happened:** Create blocked priority for customers, but PATCH accepted any field from TicketUpdate, so a customer could set priority or keep editing a ticket an agent was already working on.
+**How I fixed it:** Added customer rules in update_ticket: no priority or assignee, subject/description only while status is new, status only reopen.
+**What I learned:** Every write endpoint needs its own role checks. A rule on create does not protect update.

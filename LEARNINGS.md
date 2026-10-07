@@ -231,7 +231,7 @@
 **How I fixed it:** Changed the test emails to .com addresses with an UPDATE query.
 **What I learned:** Read the 422 response body, it says exactly which field failed and why.
 
-## Day 5 (Ayesha)
+## Day 6 (Ayesha)
 
 ### Issue #7, protected routes on the frontend
 
@@ -301,7 +301,7 @@
 **How I fixed it:** Kept both sections with "Accept Both Changes", then `git add` and `git rebase --continue`.
 **What I learned:** Conflicts in a shared log file are normal. Keep both sides and check that no conflict markers are left.
 
-## Day 6 (Ayesha)
+## Day 7 (Ayesha)
 
 ## Issue #29, role permission helper and tenant isolation tests
 
@@ -354,3 +354,25 @@
 **What happened:** Create blocked priority for customers, but PATCH accepted any field from TicketUpdate, so a customer could set priority or keep editing a ticket an agent was already working on.
 **How I fixed it:** Added customer rules in update_ticket: no priority or assignee, subject/description only while status is new, status only reopen.
 **What I learned:** Every write endpoint needs its own role checks. A rule on create does not protect update.
+
+## Day 8 (Ayesha)
+
+### Issue #30, audit log table, helper and hooks
+
+### What I did
+- Added the `AuditLog` model (`backend/models/audit_log.py`): `organization_id`, nullable `actor_user_id`, `action`, `entity_type`, `entity_id`, a JSONB `metadata` column and `created_at`, with an index on `(organization_id, created_at)`. The foreign keys have explicit names, so the downgrade works.
+- Named the Python attribute `event_metadata` (the database column is still called `metadata`), because `metadata` is a reserved name on SQLAlchemy models.
+- Added the Alembic migration for `audit_logs`, generated with `alembic revision` so it got the correct parent (`87f1cb13781a`).
+- Added `core/audit.py` with the `AuditAction` enum (all action names in one place) and the helper `log_audit_event(db, *, organization_id, action, actor_user_id, entity_type, entity_id, metadata)`. An unknown action name raises `ValueError`, so typos are caught.
+- Made the helper add the row to the session but not commit. The caller's commit saves the audit entry and the real change together, so there is never an audit entry for something that failed.
+- Hooked it into signup (after `flush()`, so the new organization and user already have ids) and login (after the password check succeeds).
+- Did not log failed logins: an unknown email has no organization, and `organization_id` is required.
+- Wrote unit tests in `backend/tests/test_audit.py`: all fields saved, optional fields, string action accepted, unknown action rejected, helper does not commit, signup and login write entries, duplicate signup and failed login write none.
+- Documented the helper in `API_CONTRACT.md` (Ayesha item 3) and updated Saqeeba's item 2, so she can call it from the ticket endpoints.
+- Agreed the helper name with the contract: `log_audit_event`, not `log_event` as the issue title said.
+
+### Problem: `NameError: name 'postgresql' is not defined` when running the migration
+**Found by:** Ayesha
+**What happened:** `alembic upgrade head` failed at `sa.Column('metadata', postgresql.JSONB(...))`. The migration used the JSONB type from `postgresql`, but the line `from sqlalchemy.dialects import postgresql` was missing from the imports at the top of the file.
+**How I fixed it:** Added the import in the right place for ruff (standard library, then `sqlalchemy`, then `alembic`). Then ran `upgrade head`, `downgrade -1` and `upgrade head` again, plus `alembic heads` and `alembic check`.
+**What I learned:** A migration is Python code, so a missing import only shows up when it runs. After pasting or editing a migration, run the upgrade, the downgrade and the upgrade again before committing. Alembic runs the migration in one transaction on PostgreSQL, so the failed run left nothing half-applied.

@@ -66,9 +66,30 @@ it should always reflect the current, real contract, not the original plan.
 - **Status:** Implemented (issue #29)
 
 ### 3. Audit log helper function
-- **What:** A function Saqeeba's ticket code can call to record an action (e.g. "ticket created," "ticket updated")
-- **How:** [TBD — e.g. `log_audit_event(actor_id, action, entity_type, entity_id, metadata)`]
-- **Status:** Not yet implemented
+- **What:** A function that records "who did what" in the `audit_logs` table. Saqeeba's ticket code calls it; it is already called from signup and login.
+- **How:** Code: `backend/core/audit.py`. Model: `backend/models/audit_log.py`.
+```python
+    from core.audit import AuditAction, log_audit_event
+
+    log_audit_event(
+        db,                                    # the request's DbSession
+        organization_id=user.organization_id,  # required
+        actor_user_id=user.id,                 # None when the system did it
+        action=AuditAction.ticket_created,     # required
+        entity_type="ticket",                  # optional
+        entity_id=ticket.id,                   # optional
+        metadata={"status": ["new", "open"]},  # optional, JSON-serializable dict
+    )
+```
+  - **It does not commit.** Call it before your `db.commit()` so the audit entry and the real change are saved together in one transaction. Do not call it for requests that fail.
+  - **Action names** are the `AuditAction` enum in `core/audit.py`. An unknown name raises `ValueError`, which catches typos. To add a new action, add one line to the enum.
+  - **Current actions:** `user.signup`, `user.login`, `user.password_reset_requested`, `user.password_reset`, `invite.created`, `invite.accepted`, `ticket.created`, `ticket.updated`, `ticket.status_changed`.
+  - **Ticket events:** `entity_type="ticket"`, `entity_id=ticket.id`, `metadata` holds the changed fields, for example `{"status": ["new", "open"]}`.
+  - **Never put secrets in `metadata`:** no passwords, tokens or invite links. Avoid emails and other personal data.
+  - **Table columns:** `id`, `organization_id` (required), `actor_user_id` (nullable), `action`, `entity_type`, `entity_id`, `metadata` (JSONB), `created_at`. Index on `(organization_id, created_at)`.
+  - **Not logged:** failed logins, because an unknown email has no organization to attach the entry to.
+  - **Tests:** `backend/tests/test_audit.py`.
+- **Status:** Implemented (issue #30)
 
 ### 4. Email sending helper
 - **What:** A reusable function to send emails (used by Saqeeba for ticket-related notifications, and by Ayesha for password reset / SLA alerts)
@@ -163,7 +184,7 @@ it should always reflect the current, real contract, not the original plan.
   - `entity_type`: `ticket`
   - `entity_id`: ticket id
   - `metadata`: changed fields, e.g. `{ "status": ["new", "open"] }`
-- **Status:** Not yet implemented. Waiting for Ayesha's `log_audit_event()` helper.
+- **Status:** Not yet implemented. - Helper is ready (see Ayesha item 3, issue #30). Saqeeba adds the calls to the ticket endpoints once #30 is merged.
 
 ### 3. Ticket list UI
 - **What:** So audit log entries can link out to the relevant ticket

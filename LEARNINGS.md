@@ -376,3 +376,22 @@
 **What happened:** `alembic upgrade head` failed at `sa.Column('metadata', postgresql.JSONB(...))`. The migration used the JSONB type from `postgresql`, but the line `from sqlalchemy.dialects import postgresql` was missing from the imports at the top of the file.
 **How I fixed it:** Added the import in the right place for ruff (standard library, then `sqlalchemy`, then `alembic`). Then ran `upgrade head`, `downgrade -1` and `upgrade head` again, plus `alembic heads` and `alembic check`.
 **What I learned:** A migration is Python code, so a missing import only shows up when it runs. After pasting or editing a migration, run the upgrade, the downgrade and the upgrade again before committing. Alembic runs the migration in one transaction on PostgreSQL, so the failed run left nothing half-applied.
+
+## Day 8 (Saqeeba)
+
+### What I did
+- Issue #37: ticket detail page. Added getTicket() and updateTicket() to api/tickets.ts, and built TicketDetail.tsx with subject, description, status badge, priority, assignee, created date, and a "Change status" section that only shows allowed next statuses from the TRANSITIONS map.
+- Removed the duplicate /tickets/:id placeholder route from App.tsx.
+- Tested: ticket loads, status changes from new to open (badge updates, buttons change to pending/resolved).
+
+### Problem: TicketDetail not rendering, placeholder showed instead
+**Found by:** Saqeeba (browser showed "This page is coming soon")
+**What happened:** App.tsx had two routes for /tickets/:id: one with TicketDetail and one with Placeholder. React Router matched the first one (TicketDetail), but the container had cached the old built file so the browser kept showing the old bundle.
+**How I fixed it:** Removed the duplicate Placeholder route, then docker compose down and up to force a fresh build. Browser cache also had to be cleared.
+**What I learned:** After changing App.tsx routes, always run npm run build and docker compose restart frontend (or down/up). The dev server hot-reload does not always pick up route changes on Windows bind mounts. Check with docker compose exec frontend grep to confirm the container has the new file before blaming the code.
+
+### Problem: Writing files to the Docker container from PowerShell
+**Found by:** Saqeeba
+**What happened:** Tried to write App.tsx using shell heredoc and Python inside the container, but neither sh heredoc (quotes broke) nor python3 (not installed) worked.
+**How I fixed it:** Used PowerShell's @' '@ here-string with [IO.File]::WriteAllText and UTF8 encoding to write the file directly on the host, then ran npm run build inside the container.
+**What I learned:** For writing multi-line files with special characters from PowerShell, use the @' '@ here-string with [IO.File]::WriteAllText. Never use Set-Content for source files (it can change encoding).

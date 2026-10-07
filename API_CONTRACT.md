@@ -185,6 +185,7 @@ it should always reflect the current, real contract, not the original plan.
   - `entity_id`: ticket id
   - `metadata`: changed fields, e.g. `{ "status": ["new", "open"] }`
 - **Status:** Not yet implemented. - Helper is ready (see Ayesha item 3, issue #30). Saqeeba adds the calls to the ticket endpoints once #30 is merged.
+- **Status:** Ticket list page implemented at `/tickets` (issue #13). Ticket detail page implemented at `/tickets/:id` (issue #37): shows subject, description, status badge, priority, assignee, created date. "Change status" buttons show only allowed next statuses (same TRANSITIONS map as backend). Status update calls `PATCH /tickets/{id}`.
 
 ### 3. Ticket list UI
 - **What:** So audit log entries can link out to the relevant ticket

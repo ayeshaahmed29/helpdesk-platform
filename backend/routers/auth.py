@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from core.audit import AuditAction, log_audit_event
 from core.auth import get_current_user, get_token_payload
 from core.token_denylist import revoke
 from database import DbSession
@@ -43,6 +44,17 @@ def signup(payload: SignupRequest, db: DbSession):
     db.add(user)
 
     try:
+        # flush first so the new organization and user have ids for the audit entry
+        db.flush()
+        log_audit_event(
+            db,
+            organization_id=user.organization_id,
+            actor_user_id=user.id,
+            action=AuditAction.user_signup,
+            entity_type="user",
+            entity_id=user.id,
+            metadata={"role": user.role.value},
+        )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -50,6 +62,7 @@ def signup(payload: SignupRequest, db: DbSession):
 
     db.refresh(user)
     return user
+
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: DbSession):
@@ -62,6 +75,16 @@ def login(payload: LoginRequest, db: DbSession):
 
     if not verify_password(payload.password, user.hashed_password) or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS)
+
+    log_audit_event(
+        db,
+        organization_id=user.organization_id,
+        actor_user_id=user.id,
+        action=AuditAction.user_login,
+        entity_type="user",
+        entity_id=user.id,
+    )
+    db.commit()
 
     return TokenResponse(
         access_token=create_access_token(user.id),

@@ -395,3 +395,42 @@
 **What happened:** Tried to write App.tsx using shell heredoc and Python inside the container, but neither sh heredoc (quotes broke) nor python3 (not installed) worked.
 **How I fixed it:** Used PowerShell's @' '@ here-string with [IO.File]::WriteAllText and UTF8 encoding to write the file directly on the host, then ran npm run build inside the container.
 **What I learned:** For writing multi-line files with special characters from PowerShell, use the @' '@ here-string with [IO.File]::WriteAllText. Never use Set-Content for source files (it can change encoding).
+
+## Day 9 (Ayesha)
+
+### Issue #31, invite users to an organization
+
+### What I did
+- Added the `Invite` model and the `invites` migration (parent `3b2eaa0d8715`). Only the SHA-256 hash of the token is stored, so a database leak does not give anyone a working invite link.
+- Added the email helper `core/email.py` with `send_email(to, subject, body)`. SMTP settings come from `.env` and `.env.example`. If `SMTP_HOST` is empty, the email is only logged. Added a Mailpit service to `docker-compose.yml`, so every email in development shows up at http://localhost:8025 and nothing is really sent.
+- Built `POST /invites`, `GET /invites`, `GET /invites/{token}` and `POST /invites/{token}/accept`. Owner and admin can invite, an admin cannot invite an owner, and duplicate pending invites and existing members are blocked. Tokens expire after 7 days and work once. The accept step locks the invite row, so two requests at the same moment cannot both succeed.
+- Wrote audit entries for `invite.created` and `invite.accepted` with `log_audit_event` (no email address or token in the metadata).
+- Wrote `tests/test_invites.py` for the success, expired, reused, invalid token, role, duplicate, existing member and failed email cases.
+- Built the public `/accept-invite/:token` page (outside the route guard) with its own messages for invalid, expired and used links.
+- Filled in the email helper and added an invites section to `API_CONTRACT.md`.
+- Added the missing `Tests` step to `.github/workflows/ci.yml` (see problem 2).
+
+### Problems and fixes
+1. **`alembic check` said the `invites` table was "removed", although the migration had run.**
+   Cause: I never added `from models.invite import Invite` to `models/__init__.py`. Alembic only compares the models that Python has imported, so it saw a table in the database with no model behind it.
+   Fix: added the import and `"Invite"` to `__all__`. Then `alembic check` showed no new operations.
+2. **The `Tests` step was missing from `ci.yml` on main, even though #29 added it.**
+   Cause: I noticed it only because the file I pasted had no `pytest` line. It was most likely lost in a merge or rebase conflict on `ci.yml`.
+   Fix: added the `pytest -v` step again as its own commit ("Run pytest in CI") on this branch, and said so in the PR description so the reviewer looks at that file.
+3. **ruff `RUF059`: unpacked variable `invite` is never used in `test_invites.py`.**
+   Cause: the test only needed the token from `invite, token = make_invite(...)`.
+   Fix: wrote `_, token = make_invite(...)`.
+4. **The invite link from Mailpit showed "Page not found".**
+   Cause: the running frontend did not have the new `/accept-invite/:token` route yet, because the container had not picked up the changed `App.tsx`.
+   Fix: checked the file inside the container with `grep`, then ran `docker compose restart frontend` and did a hard refresh (Ctrl + Shift + R).
+5. **After accepting the invite, "Go to login" leads to a placeholder, because the real login page does not exist yet.**
+   Cause: the login page is a separate issue and `AuthContext` has no `login()` yet.
+   Decision: did not add it to this PR, so the PR stays small and focused. I tested the new user with `POST /auth/login` in Swagger, and created a new issue for the real login and signup pages.
+
+### Lessons
+- A new model must be imported in `models/__init__.py`, or Alembic cannot see it.
+- Save only the hash of a secret token. The real token exists only in the email link.
+- If sending the email fails, roll everything back and return an error, so no half-finished invite blocks a retry.
+- In tests, replace `send_email` where it is used (`routers.invites.send_email`), not where it is defined.
+- After merging, check that the final version of a shared file (like `ci.yml`) still has your changes.
+- The simplest way to understand a failed UI check is to look at the file inside the container before changing anything.

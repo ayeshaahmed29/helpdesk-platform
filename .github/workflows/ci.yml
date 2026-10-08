@@ -57,6 +57,9 @@ jobs:
       - name: Models match migrations
         run: alembic check
 
+      - name: Tests
+        run: pytest -v
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

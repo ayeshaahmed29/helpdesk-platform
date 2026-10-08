@@ -15,12 +15,19 @@ services:
     ports:
       - "6379:6379"
 
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   backend:
     build: ./backend
     env_file: .env
     depends_on:
       - db
       - redis
+      - mailpit
     ports:
       - "8000:8000"
     volumes:

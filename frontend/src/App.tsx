@@ -1,6 +1,7 @@
 ﻿import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./layout/Layout";
+import AcceptInvite from "./pages/AcceptInvite";
 import NotFound from "./pages/NotFound";
 import Placeholder from "./pages/Placeholder";
 import TicketList from "./pages/TicketList";
@@ -10,6 +11,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Placeholder title="Login" />} />
+      <Route path="/accept-invite/:token" element={<AcceptInvite />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/tickets" replace />} />

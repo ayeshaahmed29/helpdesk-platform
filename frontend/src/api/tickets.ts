@@ -39,3 +39,22 @@ export function listTickets(filters: TicketFilters = {}): Promise<TicketPage> {
   params.set("page_size", String(filters.pageSize ?? 20));
   return apiFetch<TicketPage>(`/tickets?${params.toString()}`);
 }
+export interface TicketUpdate {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  subject?: string;
+  description?: string;
+  assignee_id?: number | null;
+}
+
+export function getTicket(id: number): Promise<Ticket> {
+  return apiFetch<Ticket>(`/tickets/${id}`);
+}
+
+export function updateTicket(id: number, data: TicketUpdate): Promise<Ticket> {
+  return apiFetch<Ticket>(`/tickets/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}

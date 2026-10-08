@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers.auth import router as auth_router
+from routers.invites import router as invites_router
 from routers.tickets import router as tickets_router
 
 app = FastAPI()
@@ -18,6 +19,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(tickets_router)
+app.include_router(invites_router)
+
 
 @app.get("/health")
 def health():

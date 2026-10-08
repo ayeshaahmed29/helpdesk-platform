@@ -57,6 +57,10 @@ it should always reflect the current, real contract, not the original plan.
 | `POST /auth/login` | public | same 401 message for every failure |
 | `POST /auth/logout` | any logged-in user | revokes the token |
 | `GET /auth/me` | any logged-in user | returns the current user |
+| `POST /invites` | owner, admin | admin cannot invite an owner (403); see item 8 |
+| `GET /invites` | owner, admin | only invites of the user's own company |
+| `GET /invites/{token}` | public | the secret token in the link is the permission; see item 8 |
+| `POST /invites/{token}/accept` | public | creates the user with the invited role; see item 8 |
 | `POST /tickets` | any logged-in user | `organization_id` and `requester_id` come from the current user, never from the body |
 | `GET /tickets` | staff: all tickets in their company. Customer: only their own | other companies' tickets are never returned |
 | `GET /tickets/{id}` | staff: any ticket in their company. Customer: only their own | 404 for a ticket in another company or another customer's ticket |
@@ -66,7 +70,7 @@ it should always reflect the current, real contract, not the original plan.
 - **Status:** Implemented (issue #29)
 
 ### 3. Audit log helper function
-- **What:** A function that records "who did what" in the `audit_logs` table. Saqeeba's ticket code calls it; it is already called from signup and login.
+- **What:** A function that records "who did what" in the `audit_logs` table. Saqeeba's ticket code calls it; it is already called from signup, login and invites.
 - **How:** Code: `backend/core/audit.py`. Model: `backend/models/audit_log.py`.
 ```python
     from core.audit import AuditAction, log_audit_event
@@ -84,6 +88,7 @@ it should always reflect the current, real contract, not the original plan.
   - **It does not commit.** Call it before your `db.commit()` so the audit entry and the real change are saved together in one transaction. Do not call it for requests that fail.
   - **Action names** are the `AuditAction` enum in `core/audit.py`. An unknown name raises `ValueError`, which catches typos. To add a new action, add one line to the enum.
   - **Current actions:** `user.signup`, `user.login`, `user.password_reset_requested`, `user.password_reset`, `invite.created`, `invite.accepted`, `ticket.created`, `ticket.updated`, `ticket.status_changed`.
+  - **Already called from:** signup (`user.signup`), login (`user.login`), creating an invite (`invite.created`) and accepting an invite (`invite.accepted`).
   - **Ticket events:** `entity_type="ticket"`, `entity_id=ticket.id`, `metadata` holds the changed fields, for example `{"status": ["new", "open"]}`.
   - **Never put secrets in `metadata`:** no passwords, tokens or invite links. Avoid emails and other personal data.
   - **Table columns:** `id`, `organization_id` (required), `actor_user_id` (nullable), `action`, `entity_type`, `entity_id`, `metadata` (JSONB), `created_at`. Index on `(organization_id, created_at)`.
@@ -92,9 +97,26 @@ it should always reflect the current, real contract, not the original plan.
 - **Status:** Implemented (issue #30)
 
 ### 4. Email sending helper
-- **What:** A reusable function to send emails (used by Saqeeba for ticket-related notifications, and by Ayesha for password reset / SLA alerts)
-- **How:** [TBD — e.g. `send_email(to, subject, body)`]
-- **Status:** Not yet implemented
+- **What:** A reusable function to send emails (used by Saqeeba for ticket-related notifications, and by Ayesha for invites, password reset and SLA alerts).
+- **How:** Code: `backend/core/email.py`.
+```python
+    from core.email import EmailSendError, send_email
+
+    try:
+        send_email("someone@example.com", "Subject line", "Plain text body")
+    except EmailSendError:
+        ...  # SMTP server unreachable or it refused the email
+```
+  - `send_email(to, subject, body)` sends a **plain-text** email and returns nothing. It raises `EmailSendError` if sending fails; decide in your endpoint what that means (the invite endpoint rolls back and returns 502, so nothing is saved).
+  - **It is synchronous.** The request waits until the email is sent (SMTP timeout is 10 seconds). Moving it to a background job is a later improvement.
+  - **Settings** come from `.env` (copy new lines from `.env.example` after pulling):
+    - `SMTP_HOST`: if it is **empty**, nothing is sent and the email is only written to the backend log (`docker compose logs backend`).
+    - `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_TLS` (`true` switches on STARTTLS; login is used only when `SMTP_USER` is set).
+    - `FRONTEND_URL`: used to build links inside emails (for example `http://localhost:5173/accept-invite/<token>`).
+  - **In development**, Mailpit catches every email. It is a service in `docker-compose.yml`. The inbox is at http://localhost:8025 (SMTP on port 1025). No real email ever leaves your machine.
+  - **In tests**, replace the function where it is **used**, not where it is defined. Example: `monkeypatch.setattr("routers.invites.send_email", fake)`. See `sent_emails` in `backend/tests/test_invites.py`.
+  - **Never put secrets in logs.** In log-only mode the full body is logged, including links, so do not use an empty `SMTP_HOST` outside development.
+- **Status:** Implemented (issue #31)
 
 ### 5. Signup endpoint
 - **What:** Creates a new organization (company) together with its first user, who becomes the `owner`. Every user and ticket belongs to an organization, so this is where an organization first exists.
@@ -145,22 +167,43 @@ it should always reflect the current, real contract, not the original plan.
 ### 7. Frontend routes and protection
 - **What:** Which pages exist and which need a login.
 - **How:**
-  - Public: `/login` (placeholder for now). Unknown URLs show a NotFound page.
+  - Public (outside the guard): `/login` (placeholder for now) and `/accept-invite/:token` (real page, issue #31). Unknown URLs show a NotFound page.
   - Protected (redirect to `/login` when there is no valid user; the original location is passed as `state.from`): everything inside the shared layout.
 
 | Route | Sidebar visible to | Status |
 |---|---|---|
+| `/login` | n/a (public) | placeholder |
+| `/accept-invite/:token` | n/a (public, opened from the invite email) | implemented (issue #31) |
 | `/` | n/a | redirects to `/tickets` |
-| `/tickets` | agent, admin, owner | placeholder |
-| `/tickets/:id` | n/a (opened from lists) | placeholder |
+| `/tickets` | agent, admin, owner | implemented (Saqeeba, issue #13) |
+| `/tickets/:id` | n/a (opened from lists) | implemented (Saqeeba, issue #37) |
 | `/portal` | customer | placeholder |
 | `/settings` | admin, owner | placeholder |
 | `/settings/team` | admin, owner | placeholder |
 | `/audit-log` | admin, owner | placeholder |
 
   - The guard only checks that the user is logged in. It does not check roles; the sidebar only hides links by role (`frontend/src/layout/navConfig.ts`). The backend is what enforces permissions on every endpoint.
-  - To add a page: add the `<Route>` inside the protected layout block in `App.tsx`, and add one line to `NAV_ITEMS` in `navConfig.ts` if it needs a sidebar link.
-- **Status:** Implemented (issues #6 and #7)
+  - To add a page: add the `<Route>` inside the protected layout block in `App.tsx`, and add one line to `NAV_ITEMS` in `navConfig.ts` if it needs a sidebar link. A public page goes next to `/login`, outside `ProtectedRoute`.
+- **Status:** Implemented (issues #6, #7 and #31)
+
+### 8. Invites (invite users to an organization)
+- **What:** An owner or admin invites a person by email. The person opens the link, sets a name and password, and gets an account with the invited role in the inviter's company.
+- **How:** Code: `backend/routers/invites.py`, schemas in `backend/schemas/invites.py`, model `backend/models/invite.py`. Frontend: `frontend/src/pages/AcceptInvite.tsx` and `frontend/src/api/invites.ts`.
+  - `POST /invites` (owner or admin). Body: `{ "email", "role" }` where `role` is `customer`, `agent`, `admin` or `owner`. Returns **201** `{ id, email, role, status, invited_by, expires_at, accepted_at, created_at }`. The token is **never** returned; it exists only in the email link.
+    - An **admin** cannot invite an `owner` (403). An owner can invite any role.
+    - **409** if a user with this email already exists (in any company, because emails are unique), or if this company already has a pending invite for the email. An expired or used invite does not block a new one.
+    - **502** if the email could not be sent. Nothing is saved in that case, so the request can simply be repeated.
+    - The email is saved lowercase. Agents and customers get **403**.
+  - `GET /invites` (owner or admin). Returns a list of the user's own company invites, newest first, each with `status`: `pending`, `accepted` or `expired`. No pagination yet.
+  - `GET /invites/{token}` (public). Returns `{ email, role, organization_name, expires_at }` so the accept page can show who is inviting. **404** for an unknown token, **410** if it was already used or has expired.
+  - `POST /invites/{token}/accept` (public). Body: `{ "full_name" (1–100), "password" (8–128) }`. Returns **201** with the new user (same shape as signup). Same **404** / **410** errors as above, **409** if the email was registered in the meantime, **422** for bad input. A failed attempt (for example a short password) does not use up the invite.
+    - It does **not** log the user in. The user goes to `/login` afterwards.
+  - **Token rules:** `secrets.token_urlsafe(32)`, valid for **7 days**, usable **once**. Only the **SHA-256 hash** is stored (`invites.token_hash`, unique). The accept call locks the invite row, so two requests at the same moment cannot both succeed.
+  - **Link in the email:** `FRONTEND_URL` + `/accept-invite/<token>`.
+  - **Table `invites`:** `id`, `email`, `role` (lowercase string), `organization_id` (FK), `invited_by` (FK to users, `SET NULL`), `token_hash`, `expires_at`, `accepted_at` (NULL while pending), `created_at`.
+  - **Audit:** `invite.created` (actor = inviter) and `invite.accepted` (actor = the new user), both with `entity_type="invite"`, `entity_id` = invite id and `metadata={"role": ...}`. No email address or token is logged.
+  - **Tests:** `backend/tests/test_invites.py` (success, role rules, duplicates, existing members, failed email, expired, reused, invalid token, audit entries).
+- **Status:** Implemented (issue #31)
 
 ---
 
@@ -168,51 +211,4 @@ it should always reflect the current, real contract, not the original plan.
 
 ### 1. Ticket fields: `first_response_at` and `status`
 - **What:** Needed by the SLA background job to detect overdue tickets
-- **How:** Columns on the `tickets` table (model: `backend/models/ticket.py`):
-  - `status`: `VARCHAR(20)`, not null, default `new`. Lowercase values: `new`, `open`, `pending`, `resolved`, `closed`. Indexed.
-  - `first_response_at`: `TIMESTAMP WITH TIME ZONE`, nullable. NULL means no agent has replied publicly yet.
-  - `created_at`: `TIMESTAMP WITH TIME ZONE`, not null, default `now()`. The SLA timer starts from here.
-  - `organization_id`: `INTEGER`, not null, indexed. Foreign key to `organizations.id`.
-  - `requester_id`: `INTEGER`, not null. Foreign key to `users.id`.
-  - `assignee_id`: `INTEGER`, nullable. Foreign key to `users.id`. Can be used to email the assigned agent.
-- **Status:** Implemented (tickets table in PR #15, foreign keys in issue #19)
-
-### 2. Ticket events (created, updated)
-- **What:** So the audit log can record ticket-related actions automatically
-- **How (planned):** Saqeeba calls Ayesha's `log_audit_event()` helper directly from the ticket endpoints.
-  - `action`: `ticket.created`, `ticket.updated`, `ticket.status_changed`
-  - `entity_type`: `ticket`
-  - `entity_id`: ticket id
-  - `metadata`: changed fields, e.g. `{ "status": ["new", "open"] }`
-- **Status:** Not yet implemented. - Helper is ready (see Ayesha item 3, issue #30). Saqeeba adds the calls to the ticket endpoints once #30 is merged.
-- **Status:** Ticket list page implemented at `/tickets` (issue #13). Ticket detail page implemented at `/tickets/:id` (issue #37): shows subject, description, status badge, priority, assignee, created date. "Change status" buttons show only allowed next statuses (same TRANSITIONS map as backend). Status update calls `PATCH /tickets/{id}`.
-
-### 3. Ticket list UI
-- **What:** So audit log entries can link out to the relevant ticket
-- **How:** Frontend route pattern `/tickets/:id` for a single ticket and `/tickets` for the list. Both routes exist inside the protected layout (see Ayesha item 7); Saqeeba replaces the placeholder `element` in `App.tsx` with the real pages.
-- **Status:** Ticket list page implemented at `/tickets` (issue #13). The detail page at `/tickets/:id` is still a placeholder and comes in Week 2.
-
-### 4. Comment-created event
-- **What:** So Ayesha's SLA job can mark when the first response happened
-- **How (planned):** No separate event. When an agent, admin or owner posts the first public reply, the comment endpoint sets `first_response_at` to the current time if it is still NULL. Internal notes and customer comments do not count. The SLA job only reads `first_response_at`.
-- **Status:** Not yet implemented (comments are a Week 2 task)
-
-### 5. Tickets API
-- **What:** Endpoints for creating, listing, reading and updating tickets. All require the Bearer token.
-- **How:**
-  - `POST /tickets`: body `{ subject, description }`. Priority always starts as `normal`; `organization_id` and `requester_id` come from the current user.
-  - `GET /tickets`: optional query params `status`, `priority`, `assignee_id`, plus `page` (default 1) and `page_size` (default 20, max 100). Returns `{ items, total, page, page_size }`.
-  - `GET /tickets/{id}`: returns one ticket, or 404 if it does not exist or belongs to another organization.
-  - `PATCH /tickets/{id}`: body can include `subject`, `description`, `priority`, `assignee_id`. Assignee must be an active staff user in the same organization (400 otherwise). Customers cannot assign (403).
-  - Customers only see tickets they created.
-- **Status:** Implemented (CRUD in PR #25, filtering and pagination in #27)
-## Status transitions (enforced in PATCH /tickets/{id}):
-- new -> open
-- open -> pending, resolved
-- pending -> open, resolved
-- resolved -> closed, open (reopen)
-- closed -> open (staff only)
-Any other change returns 400. Customers can only reopen (resolved -> open); other status changes by a customer return 403.
-## Customer rules for PATCH /tickets/{id}: own tickets only; cannot change assignee_id or priority (403); can edit subject/description only while status is new (403 otherwise); status changes limited to reopen (resolved -> open).
-
----
+- **How:** Columns on the

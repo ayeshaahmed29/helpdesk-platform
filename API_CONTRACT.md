@@ -212,3 +212,30 @@ it should always reflect the current, real contract, not the original plan.
 ### 1. Ticket fields: `first_response_at` and `status`
 - **What:** Needed by the SLA background job to detect overdue tickets
 - **How:** Columns on the
+
+
+## Comments (#38)
+
+### POST /tickets/{ticket_id}/comments
+Create a comment on a ticket. Both staff and customers can post.
+
+Body:
+
+{
+"body": "string (required)",
+"is_internal": false
+}
+
+
+Rules:
+- Customers cannot set `is_internal: true` (returns 403).
+- Customers never see internal notes in GET.
+- First public staff reply (not internal) sets the ticket's `first_response_at`.
+
+Response: 201 with the created comment.
+
+### GET /tickets/{ticket_id}/comments
+List comments on a ticket, oldest first.
+- Customers see only public comments (never internal).
+- Staff see all comments including internal notes.
+Response: 200 with a list of comments.

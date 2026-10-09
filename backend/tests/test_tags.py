@@ -1,8 +1,5 @@
-import pytest
-from sqlalchemy import select
-
 from models import Tag
-from models.user import UserRole
+from sqlalchemy import select
 
 
 def all_tags(db, org_id):

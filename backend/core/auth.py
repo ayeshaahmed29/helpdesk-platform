@@ -1,13 +1,13 @@
 from typing import Annotated
 
 import jwt
+from database import DbSession
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from core.token_denylist import is_revoked
-from database import DbSession
 from models import User
 from security import decode_access_token
+
+from core.token_denylist import is_revoked
 
 # auto_error=False lets us return a clean 401 ourselves when the header is missing
 bearer_scheme = HTTPBearer(auto_error=False)

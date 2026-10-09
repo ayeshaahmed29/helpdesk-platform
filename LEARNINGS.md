@@ -446,3 +446,18 @@
 - A customer-only rule needs to live in the backend (returns 403), even if the UI hides the control. Hidden UI is not security; the API has to enforce it.
 - Writing the first_response_at inside the same transaction as the comment keeps the ticket and the comment in sync. If the comment commits but the ticket update fails separately, the SLA metric is wrong.
 - GET /auth/me gave the frontend the current role, so the "Internal note" checkbox only renders for staff. Keeps the customer view clean.
+
+## Day 10 (Ayesha)
+
+## What I Did
+- **Frontend Pages & Routing:** Developed the `ForgotPasswordPage` and `ResetPasswordPage` components using React and Tailwind CSS with client-side form validation (email format checks, password length rules, and confirmation matching).
+- **API Integration (`api/auth.ts`):** Implemented client wrapper functions (`forgotPasswordRequest` and `resetPasswordRequest`) interfacing with the backend auth endpoints.
+- **AuthContext State Management:** Integrated `forgotPassword` and `resetPassword` methods into the global `AuthContext` with standardized loading states and error handling for robust failure responses..
+
+## Problems I Faced & Solutions
+- **Secure Feedback vs. User Enumeration:**
+  - *Problem:* Exposing whether an email exists in the system during a "forgot password" request poses a security risk.
+  - *Solution:* Configured the frontend and backend response handling to display a generic, ambiguous success message regardless of whether the email record was matched, preventing account enumeration attacks.
+- **Container File Syncing:**
+  - *Problem:* Managed potential Windows Docker bind mount caching issues that occasionally cause modified or newly created files to appear missing inside the development container.
+  - *Solution:* Ensured proper container restart sequences and verified volume synchronization during testing.

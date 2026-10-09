@@ -205,6 +205,20 @@ it should always reflect the current, real contract, not the original plan.
   - **Tests:** `backend/tests/test_invites.py` (success, role rules, duplicates, existing members, failed email, expired, reused, invalid token, audit entries).
 - **Status:** Implemented (issue #31)
 
+### 9. Password Reset (Forgot & Reset Password)
+- **What:** Allows users to request a password reset email using their registered email address and complete the reset using a secure token.
+- **How:** Code: `backend/routers/auth.py`, schemas in `backend/schemas/auth.py`. Frontend: `frontend/src/pages/ForgotPasswordPage.tsx`, `frontend/src/pages/ResetPasswordPage.tsx`, and `frontend/src/api/auth.ts`.
+  - `POST /auth/forgot-password` (public). Body: `{ "email": "user@example.com" }`. Returns **200** with a generic success message (e.g., instructions sent) to prevent user enumeration.
+    - Stored lowercase email lookup.
+    - Triggers an email containing a link with the secure token (`FRONTEND_URL` + `/reset-password?token=<token>`).
+    - Audit log: `user.password_reset_requested`.
+  - `POST /auth/reset-password` (public). Body: `{ "token": "string", "new_password": "at-least-8-characters" }`. Returns **200** on success.
+    - Validates token expiration and single-use constraints.
+    - Updates the user password hash (argon2).
+    - Audit log: `user.password_reset`.
+  - **Security Rules:** Tokens are securely hashed, short-lived, and invalidated after successful use.
+- **Status:** Implemented
+
 ---
 
 ## Saqeeba provides → Ayesha consumes

@@ -2,8 +2,9 @@ import {
   useCallback, useEffect, useMemo, useState,
   type ReactNode,
 } from "react";
+import { loginRequest } from "../api/auth";
 import {
-  ApiError, apiFetch, clearToken, getToken, setUnauthorizedHandler,
+  ApiError, TOKEN_KEY, apiFetch, clearToken, getToken, setUnauthorizedHandler,
 } from "../api/client";
 import { AuthContext } from "./context";
 import type { CurrentUser } from "./types";
@@ -31,6 +32,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Logs in with email and password. Throws ApiError if the login fails,
+  // so the login page can show its own message.
+  const login = useCallback(async (email: string, password: string) => {
+    // Remove an old token first, so a wrong password (401) is not treated as an expired session
+    clearToken();
+    const { access_token } = await loginRequest(email, password);
+    localStorage.setItem(TOKEN_KEY, access_token);
+    try {
+      setUser(await apiFetch<CurrentUser>("/auth/me"));
+    } catch (err) {
+      clearToken();
+      setUser(null);
+      throw err;
+    }
+  }, []);
+
+  // Loads the current user again from the server (for example after a profile change)
+  const refresh = useCallback(async () => {
+    if (!getToken()) {
+      setUser(null);
+      return;
+    }
+    try {
+      setUser(await apiFetch<CurrentUser>("/auth/me"));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) clearToken();
+      setUser(null);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await apiFetch("/auth/logout", { method: "POST" });
@@ -41,6 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, logout }), [user, loading, logout]);
+  const value = useMemo(
+    () => ({ user, loading, login, logout, refresh }),
+    [user, loading, login, logout, refresh],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

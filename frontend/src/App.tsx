@@ -2,15 +2,22 @@
 import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./layout/Layout";
 import AcceptInvite from "./pages/AcceptInvite";
+import ForgotPassword from "./pages/ForgotPassword";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Placeholder from "./pages/Placeholder";
+import ResetPassword from "./pages/ResetPassword";
+import Signup from "./pages/Signup";
 import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Placeholder title="Login" />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/accept-invite/:token" element={<AcceptInvite />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>

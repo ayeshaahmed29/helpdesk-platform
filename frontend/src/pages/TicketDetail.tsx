@@ -108,14 +108,17 @@ export default function TicketDetail() {
         setComments((prev) => [...prev, newComment]);
         setBody("");
         setIsInternal(false);
-        return getTicket(ticketId);
-      })
-      .then((ticket) => {
-        setState((prev) =>
-          prev.phase === "ready"
-            ? { phase: "ready", ticket, saving: false, saveError: null }
-            : prev
-        );
+        getTicket(ticketId)
+          .then((ticket) => {
+            setState((prev) =>
+              prev.phase === "ready"
+                ? { phase: "ready", ticket, saving: false, saveError: null }
+                : prev
+            );
+          })
+          .catch(() => {
+            /* comment is saved; refresh failing is not the user's problem */
+          });
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Could not post comment.";
@@ -140,8 +143,15 @@ export default function TicketDetail() {
   }
 
   const { ticket, saving, saveError } = state;
-  const allowedStatuses = TRANSITIONS[ticket.status] ?? [];
   const isStaff = role !== null && role !== "customer";
+  const allowedStatuses: TicketStatus[] =
+    role === null
+      ? []
+      : role === "customer"
+        ? ticket.status === "resolved"
+          ? ["open"]
+          : []
+        : TRANSITIONS[ticket.status] ?? [];
 
   return (
     <div className="space-y-6">

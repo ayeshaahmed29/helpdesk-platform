@@ -1,10 +1,13 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+Body = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10000)]
 
 
 class CommentCreate(BaseModel):
-    body: str = Field(min_length=1)
+    body: Body
     is_internal: bool = False
 
 

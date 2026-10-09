@@ -253,3 +253,30 @@ List comments on a ticket, oldest first.
 - Customers see only public comments (never internal).
 - Staff see all comments including internal notes.
 Response: 200 with a list of comments.
+
+## Tags (New - Issue #39)
+
+### POST /tags
+Create a new tag (agent+ only)
+- Request: `{"name": "urgent", "color": "red"}`
+- Response: 201 TagRead
+- Error: 403 if customer
+
+### GET /tags
+List all tags in user's organization
+- Response: 200 list[TagRead]
+
+### DELETE /tags/{tag_id}
+Delete a tag (agent+ only)
+- Response: 204
+- Error: 403 if customer, 404 if not found
+
+### POST /tags/{tag_id}/tickets/{ticket_id}
+Add tag to ticket (agent+ only)
+- Response: 204
+- Error: 403 if customer, 404 if tag/ticket not found
+
+### DELETE /tags/{tag_id}/tickets/{ticket_id}
+Remove tag from ticket (agent+ only)
+- Response: 204
+- Error: 403 if customer, 404 if tag/ticket not found

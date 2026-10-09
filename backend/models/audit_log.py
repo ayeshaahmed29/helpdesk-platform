@@ -1,11 +1,10 @@
 from datetime import datetime
 from typing import Any
 
+from database import Base
 from sqlalchemy import DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-
-from database import Base
 
 
 class AuditLog(Base):

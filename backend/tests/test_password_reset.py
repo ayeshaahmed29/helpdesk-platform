@@ -3,10 +3,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
-
 from models import AuditLog, PasswordResetToken
 from security import hash_password, verify_password
+from sqlalchemy import select
 
 OLD_PASSWORD = "the-old-password"
 NEW_PASSWORD = "the-new-password"

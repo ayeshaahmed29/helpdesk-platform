@@ -1,17 +1,16 @@
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.orm import sessionmaker
-
 from core.auth import get_current_user
 from database import DATABASE_URL, Base, get_db
+from fastapi.testclient import TestClient
 from main import app
 from models import Ticket, User
 from models.organization import Organization
 from models.user import UserRole
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import sessionmaker
 
 TEST_DB_NAME = "helpdesk_test"
 TEST_DATABASE_URL = make_url(DATABASE_URL).set(database=TEST_DB_NAME)

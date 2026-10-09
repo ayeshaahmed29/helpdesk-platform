@@ -2,9 +2,6 @@ from types import SimpleNamespace
 from typing import Annotated
 
 import pytest
-from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
-
 from core.auth import get_current_user
 from core.permissions import (
     MANAGER_ROLES,
@@ -12,6 +9,8 @@ from core.permissions import (
     ensure_same_org,
     require_role,
 )
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
 from models import User
 from models.user import UserRole
 

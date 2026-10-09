@@ -1,14 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-
 from core.auth import get_current_user
 from database import DbSession
-from models import Tag, Ticket, User
+from fastapi import APIRouter, Depends, HTTPException, status
+from models import Tag, User
 from models.user import UserRole
-from routers.tickets import get_ticket_or_404
 from schemas.tag import TagCreate, TagRead
+from sqlalchemy import select
+
+from routers.tickets import get_ticket_or_404
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 

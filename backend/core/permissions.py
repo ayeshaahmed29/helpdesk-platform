@@ -2,10 +2,10 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-
-from core.auth import get_current_user
 from models import User
 from models.user import UserRole
+
+from core.auth import get_current_user
 
 STAFF_ROLES = (UserRole.agent, UserRole.admin, UserRole.owner)
 MANAGER_ROLES = (UserRole.admin, UserRole.owner)

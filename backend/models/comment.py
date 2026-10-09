@@ -1,9 +1,8 @@
 from datetime import datetime
 
+from database import Base
 from sqlalchemy import Boolean, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
-
-from database import Base
 
 
 class Comment(Base):

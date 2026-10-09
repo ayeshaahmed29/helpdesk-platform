@@ -3,12 +3,11 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
-
 from core.email import EmailSendError
 from models import AuditLog, Invite, User
 from models.user import UserRole
 from security import verify_password
+from sqlalchemy import select
 
 PASSWORD = "a-good-password"
 

@@ -4,14 +4,11 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-
 from core.audit import AuditAction, log_audit_event
 from core.email import EmailSendError, send_email
 from core.permissions import MANAGER_ROLES, require_role
 from database import DbSession
+from fastapi import APIRouter, Depends, HTTPException, status
 from models import Invite, Organization, User
 from models.user import UserRole
 from schemas.auth import UserPublic
@@ -22,6 +19,8 @@ from schemas.invites import (
     InvitePreview,
 )
 from security import hash_password
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/invites", tags=["invites"])
 

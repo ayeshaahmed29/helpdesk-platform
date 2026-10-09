@@ -434,3 +434,15 @@
 - In tests, replace `send_email` where it is used (`routers.invites.send_email`), not where it is defined.
 - After merging, check that the final version of a shared file (like `ci.yml`) still has your changes.
 - The simplest way to understand a failed UI check is to look at the file inside the container before changing anything.
+
+
+## Day 9 (Saqeeba)
+
+### What I did
+- Issue #38: comments and internal notes. New comments table + migration, POST/GET /tickets/{id}/comments, is_internal flag with customer block, first public staff reply sets first_response_at.
+- Frontend: comments list and reply form on the ticket detail page, with the "Internal note" checkbox hidden for customers.
+
+### Learned
+- A customer-only rule needs to live in the backend (returns 403), even if the UI hides the control. Hidden UI is not security; the API has to enforce it.
+- Writing the first_response_at inside the same transaction as the comment keeps the ticket and the comment in sync. If the comment commits but the ticket update fails separately, the SLA metric is wrong.
+- GET /auth/me gave the frontend the current role, so the "Internal note" checkbox only renders for staff. Keeps the customer view clean.

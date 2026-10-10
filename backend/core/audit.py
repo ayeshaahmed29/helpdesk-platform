@@ -1,8 +1,9 @@
 from enum import StrEnum
 from typing import Any
 
-from models.audit_log import AuditLog
 from sqlalchemy.orm import Session
+
+from models.audit_log import AuditLog
 
 
 class AuditAction(StrEnum):

@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from models.user import UserRole
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from models.user import UserRole
 
 
 class InviteCreate(BaseModel):

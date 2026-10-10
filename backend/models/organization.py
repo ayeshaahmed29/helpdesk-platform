@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
 if TYPE_CHECKING:
+    from models.tag import Tag
     from models.user import User
 
 
@@ -23,3 +24,4 @@ class Organization(Base):
     sla_first_response_hours: Mapped[int] = mapped_column(default=4)
 
     users: Mapped[list["User"]] = relationship(back_populates="organization")
+    tags: Mapped[list["Tag"]] = relationship(back_populates="organization")

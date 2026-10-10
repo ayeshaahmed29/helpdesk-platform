@@ -1,5 +1,6 @@
-from models import Tag
 from sqlalchemy import select
+
+from models import Tag
 
 
 def all_tags(db, org_id):

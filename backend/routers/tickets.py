@@ -1,8 +1,11 @@
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import Select, func, select
+from sqlalchemy.orm import Session
+
 from core.auth import get_current_user
 from database import DbSession
-from fastapi import APIRouter, Depends, HTTPException, Query, status
 from models import Ticket, User
 from models.user import UserRole
 from schemas.ticket import (
@@ -13,8 +16,6 @@ from schemas.ticket import (
     TicketStatus,
     TicketUpdate,
 )
-from sqlalchemy import Select, func, select
-from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 

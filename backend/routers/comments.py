@@ -1,15 +1,15 @@
 from datetime import datetime, timezone
 from typing import Annotated
 
-from core.auth import get_current_user
-from database import DbSession
 from fastapi import APIRouter, Depends, HTTPException, status
-from models import Comment, User
-from models.user import UserRole
-from schemas.comment import CommentCreate, CommentRead
 from sqlalchemy import select
 
+from core.auth import get_current_user
+from database import DbSession
+from models import Comment, User
+from models.user import UserRole
 from routers.tickets import get_ticket_or_404
+from schemas.comment import CommentCreate, CommentRead
 
 router = APIRouter(prefix="/tickets/{ticket_id}/comments", tags=["comments"])
 

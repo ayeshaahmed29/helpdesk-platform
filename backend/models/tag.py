@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from database import Base
 from sqlalchemy import (
     Column,
     DateTime,
@@ -12,6 +11,8 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from database import Base
 
 if TYPE_CHECKING:
     from models.organization import Organization

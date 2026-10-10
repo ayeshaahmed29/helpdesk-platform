@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from database import Base
 from sqlalchemy import DateTime, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+
+from database import Base
 
 
 class PasswordResetToken(Base):

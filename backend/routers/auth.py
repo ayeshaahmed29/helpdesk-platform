@@ -5,12 +5,15 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
+
 from core.audit import AuditAction, log_audit_event
 from core.auth import get_current_user, get_token_payload
 from core.email import EmailSendError, send_email
 from core.token_denylist import revoke
 from database import DbSession
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from models.organization import Organization
 from models.password_reset_token import PasswordResetToken
 from models.user import User, UserRole
@@ -29,8 +32,6 @@ from security import (
     hash_password,
     verify_password,
 )
-from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

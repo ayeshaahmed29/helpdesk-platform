@@ -1,8 +1,9 @@
 import pytest
+from sqlalchemy import select
+
 from core.audit import AuditAction, log_audit_event
 from models import AuditLog
 from models.user import UserRole
-from sqlalchemy import select
 
 SIGNUP = {
     "organization_name": "FastMart",

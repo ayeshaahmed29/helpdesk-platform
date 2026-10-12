@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -47,8 +47,8 @@ def make_reset_token(db, user, expires_in=timedelta(hours=1), used=False):
     row = PasswordResetToken(
         user_id=user.id,
         token_hash=hash_token(token),
-        expires_at=datetime.now(timezone.utc) + expires_in,
-        used_at=datetime.now(timezone.utc) if used else None,
+        expires_at=datetime.now(UTC) + expires_in,
+        used_at=datetime.now(UTC) if used else None,
     )
     db.add(row)
     db.commit()

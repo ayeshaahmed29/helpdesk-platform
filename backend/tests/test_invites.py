@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -55,8 +55,8 @@ def make_invite(
         organization_id=org.id,
         invited_by=invited_by.id if invited_by else None,
         token_hash=hash_token(token),
-        expires_at=datetime.now(timezone.utc) + expires_in,
-        accepted_at=datetime.now(timezone.utc) if accepted else None,
+        expires_at=datetime.now(UTC) + expires_in,
+        accepted_at=datetime.now(UTC) if accepted else None,
     )
     db.add(invite)
     db.commit()

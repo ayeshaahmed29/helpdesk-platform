@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
 if TYPE_CHECKING:
+    from models.tag import Tag
     from models.user import User
     from models.tag import Tag
 

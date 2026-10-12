@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(tickets_router)
 app.include_router(comments_router)
+app.include_router(tags_router)
 app.include_router(invites_router)
 app.include_router(tags_router)
 app.include_router(audit_logs_router)

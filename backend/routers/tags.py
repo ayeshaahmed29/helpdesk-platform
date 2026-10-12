@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from core.auth import get_current_user
 from database import DbSession
@@ -15,8 +16,7 @@ router = APIRouter(prefix="/tags", tags=["tags"])
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def get_tag_or_404(db: DbSession, user: User, tag_id: int) -> Tag:
-    """Fetch tag and verify it belongs to user's organization."""
+def get_tag_or_404(db, user, tag_id):
     tag = db.scalar(select(Tag).where(Tag.id == tag_id))
     if not tag or tag.organization_id != user.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
@@ -41,7 +41,14 @@ def create_tag(
         organization_id=user.organization_id,
     )
     db.add(tag)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A tag with this name already exists",
+        )
     db.refresh(tag)
     return tag
 

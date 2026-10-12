@@ -1,4 +1,4 @@
-fastapi
+﻿fastapi
 uvicorn[standard]
 sqlalchemy
 alembic
@@ -8,4 +8,5 @@ email-validator
 pyjwt
 redis
 pytest
-httpxpython-multipart
+httpx
+python-multipart

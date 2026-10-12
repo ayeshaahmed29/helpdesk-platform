@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -45,7 +45,7 @@ def create_comment(
         and not payload.is_internal
         and ticket.first_response_at is None
     ):
-        ticket.first_response_at = datetime.now(timezone.utc)
+        ticket.first_response_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(comment)

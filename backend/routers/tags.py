@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from core.auth import get_current_user
 from database import DbSession
-from models import Tag, Ticket, User
+from models import Tag, User
 from models.user import UserRole
 from routers.tickets import get_ticket_or_404
 from schemas.tag import TagCreate, TagRead

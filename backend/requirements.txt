@@ -8,4 +8,4 @@ email-validator
 pyjwt
 redis
 pytest
-httpx
+httpxpython-multipart

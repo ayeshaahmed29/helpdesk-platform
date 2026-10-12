@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,7 +16,7 @@ ManagerUser = Annotated[User, Depends(require_role(*MANAGER_ROLES))]
 
 
 def _start_of_day(day: date) -> datetime:
-    return datetime.combine(day, time.min, tzinfo=timezone.utc)
+    return datetime.combine(day, time.min, tzinfo=UTC)
 
 
 @router.get("", response_model=AuditLogPage)

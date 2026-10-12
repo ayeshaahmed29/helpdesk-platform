@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -24,7 +24,7 @@ def add_entry(
 
 
 def day(number, hour=12, minute=0):
-    return datetime(2026, 10, number, hour, minute, tzinfo=timezone.utc)
+    return datetime(2026, 10, number, hour, minute, tzinfo=UTC)
 
 
 def ids(response):

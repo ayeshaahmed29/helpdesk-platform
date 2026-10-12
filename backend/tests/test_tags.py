@@ -93,3 +93,23 @@ def test_cannot_add_same_tag_twice(client, world, login_as):
     client.post(f"/tags/{tag_id}/tickets/{world.ticket_a.id}")
     response = client.post(f"/tags/{tag_id}/tickets/{world.ticket_a.id}")
     assert response.status_code == 204
+
+
+
+
+def test_duplicate_tag_name_same_org_rejected(client, world, login_as):
+    login_as(world.agent_a)
+    client.post("/tags", json={"name": "Billing", "color": "#ff0000"})
+    response = client.post("/tags", json={"name": "billing", "color": "#0000ff"})
+    assert response.status_code == 409
+    assert "already exists" in response.json()["detail"]
+
+
+def test_same_tag_name_different_org_allowed(client, world, login_as):
+    login_as(world.agent_a)
+    response_a = client.post("/tags", json={"name": "billing", "color": "#ff0000"})
+    assert response_a.status_code == 201
+
+    login_as(world.agent_b)
+    response_b = client.post("/tags", json={"name": "billing", "color": "#0000ff"})
+    assert response_b.status_code == 201

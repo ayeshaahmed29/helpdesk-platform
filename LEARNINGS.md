@@ -461,3 +461,26 @@
 - **Container File Syncing:**
   - *Problem:* Managed potential Windows Docker bind mount caching issues that occasionally cause modified or newly created files to appear missing inside the development container.
   - *Solution:* Ensured proper container restart sequences and verified volume synchronization during testing.
+
+  ## Day 10 (Saqeeba)
+
+### What I Did
+- **Issue #39 (Tags):** Complete tag support implementation
+- **Database:** Created tags table + ticket_tags many-to-many join table with migration 4bf6e480a7c5
+- **Models:** Tag model with relationships to Organization and Ticket (via ticket_tags)
+- **Backend:** 5 API endpoints (GET /tags, POST /tags, DELETE /tags/{id}, POST add-tag, DELETE remove-tag)
+- **Schemas:** TagCreate (name + optional color), TagRead with timestamps
+- **Frontend:** API client at api/tags.ts with 5 functions
+- **Tests:** 9 new test_tags.py tests covering permissions, org scoping, and ticket associations (all passing)
+
+### Test Results
+- All 92 tests pass (83 existing + 9 new tag tests)
+- Permission checks: customers cannot create/delete/manage tags
+- Org isolation: agents only see tags from their organization
+- Idempotent tag-to-ticket operations
+
+### Key Implementation Details
+- Tags are org-scoped (unique constraint on organization_id + name)
+- Ticket-tag relationships are many-to-many (via SQLAlchemy secondary)
+- All delete operations use ondelete='CASCADE' for data integrity
+- Customers cannot manage tags (403 on all write operations)

@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers.attachments import router as attachments_router
+from routers.audit_logs import router as audit_logs_router
 from routers.auth import router as auth_router
 from routers.comments import router as comments_router
 from routers.invites import router as invites_router
@@ -25,6 +26,7 @@ app.include_router(tickets_router)
 app.include_router(comments_router)
 app.include_router(invites_router)
 app.include_router(tags_router)
+app.include_router(audit_logs_router)
 app.include_router(attachments_router)
 
 

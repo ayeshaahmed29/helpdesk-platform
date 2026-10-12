@@ -9,7 +9,6 @@ from database import Base
 if TYPE_CHECKING:
     from models.tag import Tag
     from models.user import User
-    from models.tag import Tag
 
 
 class Organization(Base):

@@ -61,7 +61,7 @@ async def upload_attachment(
     stored_name = f"{uuid.uuid4().hex}{ext}"
     storage_path = os.path.join(UPLOAD_DIR, stored_name)
 
-    with open(storage_path, "wb") as f:
+    with open(storage_path, "wb") as f:  # noqa: PTH123
         f.write(contents)
 
     attachment = Attachment(

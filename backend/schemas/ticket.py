@@ -3,13 +3,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from schemas.tag import TagRead
+
 Priority = Literal["low", "normal", "high", "urgent"]
 TicketStatus = Literal["new", "open", "pending", "resolved", "closed"]
+
 
 class TicketCreate(BaseModel):
     subject: str = Field(min_length=1, max_length=255)
     description: str = Field(min_length=1)
-   
 
 
 class TicketUpdate(BaseModel):
@@ -34,6 +36,9 @@ class TicketRead(BaseModel):
     first_response_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    tags: list[TagRead] = []
+
+
 class TicketListResponse(BaseModel):
     items: list[TicketRead]
     total: int

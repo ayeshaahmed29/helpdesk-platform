@@ -280,3 +280,30 @@ Add tag to ticket (agent+ only)
 Remove tag from ticket (agent+ only)
 - Response: 204
 - Error: 403 if customer, 404 if tag/ticket not found
+## Attachments (Issue #40)
+
+### POST /tickets/{ticket_id}/attachments
+Upload a file attachment to a ticket (multipart/form-data).
+- Field: file (the file to upload)
+- Allowed types: images (jpeg, png, gif, webp), pdf, txt - validated against the file's extension AND its declared content type, not just one or the other
+- Max size: 5 MB
+- Response: 201 AttachmentRead
+- Error: 400 if type/size invalid, 404 if ticket not in user's org
+
+### GET /tickets/{ticket_id}/attachments
+List attachments on a ticket, oldest first.
+- Response: 200 list[AttachmentRead]
+- Error: 404 if ticket not in user's org
+
+### GET /attachments/{attachment_id}/download
+Download an attachment's file.
+- Response: 200 file stream (original filename, correct content type)
+- Error: 404 if attachment not in user's org, or if the file is missing on disk
+
+### GET /tickets/{id} now includes tags
+TicketRead responses include a tags field:
+[{"id": 1, "name": "urgent", "color": "#ff0000", "organization_id": 1, "created_at": "..."}]
+
+### Tag validation update (Issue #39 follow-up)
+- Tag names are lowercased and trimmed before saving, so "Billing" and "billing" are treated as the same tag within a company (409 on duplicate).
+- Tag color must be a hex code matching ^#[0-9a-fA-F]{6}$, or null. Any other value returns 422.

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 
 import {
@@ -14,6 +14,13 @@ import {
   type Comment,
 } from "../api/comments";
 import { getCurrentUser, type UserRole } from "../api/auth";
+import { listTags, addTagToTicket, removeTagFromTicket, type Tag } from "../api/tags";
+import {
+  listAttachments,
+  uploadAttachment,
+  downloadAttachment,
+  type Attachment,
+} from "../api/attachments";
 
 const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   new: ["open"],
@@ -38,6 +45,12 @@ const priorityStyles: Record<TicketPriority, string> = {
   urgent: "text-red-600 font-semibold",
 };
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 type State =
   | { phase: "loading" }
   | { phase: "error"; message: string }
@@ -56,12 +69,24 @@ export default function TicketDetail() {
   const [postError, setPostError] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
 
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [ticketTags, setTicketTags] = useState<Tag[]>([]);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     let cancelled = false;
     getTicket(ticketId)
       .then((ticket) => {
-        if (!cancelled)
+        if (!cancelled) {
           setState({ phase: "ready", ticket, saving: false, saveError: null });
+          const t = ticket as Ticket & { tags?: Tag[] };
+          if (t.tags) setTicketTags(t.tags);
+        }
       })
       .catch(() => {
         if (!cancelled)
@@ -78,9 +103,17 @@ export default function TicketDetail() {
       .then((u) => {
         if (!cancelled) setRole(u.role);
       })
-      .catch(() => {
-        /* ignore */
-      });
+      .catch(() => {});
+    listTags()
+      .then((tags) => {
+        if (!cancelled) setAllTags(tags);
+      })
+      .catch(() => {});
+    listAttachments(ticketId)
+      .then((atts) => {
+        if (!cancelled) setAttachments(atts);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -96,6 +129,42 @@ export default function TicketDetail() {
       .catch(() =>
         setState({ ...state, saving: false, saveError: "Could not update status. Please try again." })
       );
+  }
+
+  async function handleAddTag(tag: Tag) {
+    try {
+      await addTagToTicket(tag.id, ticketId);
+      setTicketTags((prev) => [...prev, tag]);
+      setShowTagDropdown(false);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function handleRemoveTag(tag: Tag) {
+    try {
+      await removeTagFromTicket(tag.id, ticketId);
+      setTicketTags((prev) => prev.filter((t) => t.id !== tag.id));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const att = await uploadAttachment(ticketId, file);
+      setAttachments((prev) => [...prev, att]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Upload failed.";
+      setUploadError(msg);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   function handleCommentSubmit(e: React.FormEvent) {
@@ -116,9 +185,7 @@ export default function TicketDetail() {
                 : prev
             );
           })
-          .catch(() => {
-            /* comment is saved; refresh failing is not the user's problem */
-          });
+          .catch(() => {});
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Could not post comment.";
@@ -152,6 +219,10 @@ export default function TicketDetail() {
           ? ["open"]
           : []
         : TRANSITIONS[ticket.status] ?? [];
+
+  const availableTags = allTags.filter(
+    (t) => !ticketTags.some((tt) => tt.id === t.id)
+  );
 
   return (
     <div className="space-y-6">
@@ -192,6 +263,61 @@ export default function TicketDetail() {
           </div>
         </div>
 
+        {/* Tags Section */}
+        <div className="border-t border-gray-100 pt-4 space-y-2">
+          <p className="text-sm text-gray-500">Tags</p>
+          <div className="flex flex-wrap gap-2">
+            {ticketTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-white"
+                style={{ backgroundColor: tag.color ?? "#6b7280" }}
+              >
+                {tag.name}
+                {isStaff && (
+                  <button
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-1 hover:opacity-75"
+                    title="Remove tag"
+                  >
+                    x
+                  </button>
+                )}
+              </span>
+            ))}
+            {ticketTags.length === 0 && (
+              <span className="text-xs text-gray-400">No tags</span>
+            )}
+          </div>
+          {isStaff && availableTags.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowTagDropdown(!showTagDropdown)}
+                className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+              >
+                + Add tag
+              </button>
+              {showTagDropdown && (
+                <div className="absolute z-10 mt-1 w-48 rounded border border-gray-200 bg-white shadow-lg">
+                  {availableTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => handleAddTag(tag)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                    >
+                      <span
+                        className="inline-block h-3 w-3 rounded-full"
+                        style={{ backgroundColor: tag.color ?? "#6b7280" }}
+                      />
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {allowedStatuses.length > 0 && (
           <div className="border-t border-gray-100 pt-4 space-y-2">
             <p className="text-sm text-gray-500">Change status</p>
@@ -213,6 +339,51 @@ export default function TicketDetail() {
         )}
       </div>
 
+      {/* Attachments Section */}
+      <div className="rounded border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Attachments</h2>
+
+        {attachments.length === 0 && (
+          <p className="text-sm text-gray-500">No attachments yet.</p>
+        )}
+
+        {attachments.length > 0 && (
+          <ul className="divide-y divide-gray-100">
+            {attachments.map((att) => (
+              <li key={att.id} className="flex items-center justify-between py-2">
+                <div className="text-sm">
+                  <button
+                    onClick={() => downloadAttachment(att.id, att.filename)}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    {att.filename}
+                  </button>
+                  <span className="ml-2 text-gray-400">
+                    {formatSize(att.size)} - {att.content_type}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {new Date(att.created_at).toLocaleDateString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="border-t border-gray-100 pt-3">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            disabled={uploading}
+            className="text-sm"
+          />
+          {uploading && <p className="text-xs text-gray-500 mt-1">Uploading...</p>}
+          {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
+        </div>
+      </div>
+
+      {/* Comments Section */}
       <div className="rounded border border-gray-200 bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Comments</h2>
 

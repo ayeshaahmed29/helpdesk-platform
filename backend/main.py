@@ -6,8 +6,10 @@ from routers.audit_logs import router as audit_logs_router
 from routers.auth import router as auth_router
 from routers.comments import router as comments_router
 from routers.invites import router as invites_router
+from routers.settings import router as settings_router
 from routers.tags import router as tags_router
 from routers.tickets import router as tickets_router
+from routers.users import router as users_router
 
 app = FastAPI()
 
@@ -29,6 +31,8 @@ app.include_router(invites_router)
 app.include_router(tags_router)
 app.include_router(audit_logs_router)
 app.include_router(attachments_router)
+app.include_router(settings_router)
+app.include_router(users_router)
 
 
 @app.get("/health")

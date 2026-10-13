@@ -14,10 +14,15 @@ class AuditAction(StrEnum):
     user_login = "user.login"
     user_password_reset_requested = "user.password_reset_requested"
     user_password_reset = "user.password_reset"
+    user_role_changed = "user.role_changed"
+    user_deactivated = "user.deactivated"
 
     # invites
     invite_created = "invite.created"
     invite_accepted = "invite.accepted"
+
+    # settings
+    settings_sla_updated = "settings.sla_updated"
 
     # tickets (called from Saqeeba's endpoints)
     ticket_created = "ticket.created"

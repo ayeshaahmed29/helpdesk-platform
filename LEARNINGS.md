@@ -462,6 +462,27 @@
   - *Problem:* Managed potential Windows Docker bind mount caching issues that occasionally cause modified or newly created files to appear missing inside the development container.
   - *Solution:* Ensured proper container restart sequences and verified volume synchronization during testing.
 
+### Issue #35, audit log viewer (API and page)
+
+### What I did
+- Added `GET /audit-logs` for owner and admin (`routers/audit_logs.py`, `schemas/audit_logs.py`). It is filtered by the user's company, with filters for action and date range and pagination (`page`, `page_size`), newest first.
+- Joined the users table in the same query to return the actor's name, so there is one database query for the list and no extra query per row.
+- Wrote `tests/test_audit_logs.py`: another company's entries never appear (also when filters are used), agent and customer get 403, action and date filters, pagination, actor name and system entries.
+- Built the `/audit-log` page with action and date filters, a table (time, actor, action, entity, details), a link from ticket entries to the ticket, and Previous/Next pagination in the same style as the ticket list.
+- No migration was needed, because the table already existed. This also meant no risk of multiple heads while Saqeeba's tags migration is open.
+
+### Problems and fixes
+- Backend: all 95 tests and ruff passed at the first run.
+- <add here any problem you hit while testing the page, in the same format as before: what happened, cause, fix>
+
+### Learned
+- The company filter is the first condition and comes from the logged-in user, never from the request. The test also uses filters, to prove a filter cannot let another company's data through.
+- Declaring `action` as the `AuditAction` enum in the query gives a 422 for typos for free, without extra code.
+- For "up to and including this day", filter with `created_at < start of the next day`. A filter like `<= 2026-10-05 00:00` would miss everything that happened on the 5th.
+- Dates are UTC days in the API, but the table shows local time. I wrote this on the page so nobody is surprised.
+- The list of actions in the frontend is a copy of the backend enum. It has to be updated by hand when a new action is added. I documented this in API_CONTRACT.md for Saqeeba.
+- A role check in the UI is only for the sidebar. Opening `/audit-log` as an agent still shows the page, but the backend answers 403 and the page shows a message.
+
   ## Day 10 (Saqeeba)
 
 ### What I Did
@@ -553,3 +574,28 @@
 **What happened:** app.include_router(tags_router) appeared twice in main.py, left over from an earlier merge where both branches added their own include line for tags.
 **How I fixed it:** Removed the duplicate line.
 **What I learned:** After resolving a merge conflict in a file that's mostly a list of near-identical lines, do a quick visual scan of the final result, not just a check that it runs.
+
+## Day 11 (Ayesha)
+
+### Issue #52, SLA policy setting and team management API
+
+### What I did
+- Added `GET /settings/sla` and `PUT /settings/sla` (owner and admin). The value is validated to 1–168 and the company comes from the logged-in user.
+- Reused the existing column `organizations.sla_first_response_hours` instead of adding `sla_first_reply_hours`. It was already `NOT NULL` and every row had a value, so no migration was needed. The API field is called `first_reply_hours`.
+- Added `GET /users` and `PATCH /users/{id}` (owner and admin) with these rules: an admin cannot create or change an owner, nobody can demote or deactivate themselves, the last active owner is protected, and a user from another company returns 404.
+- Added the audit actions `settings.sla_updated`, `user.role_changed` and `user.deactivated`, and added them to `ACTIONS` in `AuditLog.tsx`.
+- Wrote `test_sla_settings.py` and `test_users_admin.py`, including cross-company access and every role rule.
+- Updated `API_CONTRACT.md` with the endpoint table rows and two new items.
+
+### Problem: `ModuleNotFoundError: No module named 'schemas.settings'`
+**Found by:** Ayesha (pytest failed while loading `conftest.py`)
+**What happened:** `main.py` imports `routers/settings.py`, which imports `schemas/settings.py`. The container could not find that file, so importing `main` failed and no test could start. Either the file was missing or it had not synced into the container (Windows bind mount).
+**How I fixed it:** Checked the folder on Windows and inside the container (`dir backend\schemas` and `docker compose exec backend ls schemas`), created or synced the file, and restarted the backend before running pytest again.
+**What I learned:** An import error in one new file stops the whole test run, because `conftest.py` imports `main`. When a module is "not found", check that the file exists inside the container before changing code.
+
+### Learned
+- Check what the database already has before writing a migration. The column existed, so the safest migration was no migration.
+- Return the same 404 and the same message for "does not exist" and "belongs to another company", so one company cannot learn which ids exist in another.
+- Keep the field name of the API separate from the database column name. The API contract is the promise, and the column can keep its older name.
+- A rule that protects the last owner is a safety net. The other rules already make it hard to reach through the API, so the test has to set up the situation on purpose. Lock the other owner rows while counting, so two requests at the same moment cannot remove both.
+- A request with the same value should change nothing and write no audit entry, so the log only shows real changes.

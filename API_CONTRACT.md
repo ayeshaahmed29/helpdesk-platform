@@ -65,6 +65,11 @@ it should always reflect the current, real contract, not the original plan.
 | `GET /tickets` | staff: all tickets in their company. Customer: only their own | other companies' tickets are never returned |
 | `GET /tickets/{id}` | staff: any ticket in their company. Customer: only their own | 404 for a ticket in another company or another customer's ticket |
 | `PATCH /tickets/{id}` | staff: any ticket in their company. Customer: only their own | customers cannot set `assignee_id` (403); the assignee must be active staff in the same company (400) |
+| `GET /audit-logs` | owner, admin | only audit entries of the user's own company; agents and customers get 403 |
+| `GET /settings/sla` | owner, admin | the company's first-reply SLA in hours; agents and customers get 403; see item 11 |
+| `PUT /settings/sla` | owner, admin | sets `first_reply_hours` (1–168) for the user's own company; see item 11 |
+| `GET /users` | owner, admin | only users of the user's own company; see item 12 |
+| `PATCH /users/{id}` | owner, admin | change `role` or `is_active`; an admin cannot touch an owner; see item 12 |
 
   - **Tests:** `backend/tests/test_permissions.py` tests the helpers. `backend/tests/test_tenant_isolation.py` proves that company A cannot read or change company B's tickets, and that customers only see their own tickets. Run them with `docker compose exec backend pytest -v`. Tests use a separate `helpdesk_test` database and replace `get_current_user`, so they need neither Redis nor a real login (fixtures are in `backend/tests/conftest.py`).
 - **Status:** Implemented (issue #29)
@@ -87,8 +92,8 @@ it should always reflect the current, real contract, not the original plan.
 ```
   - **It does not commit.** Call it before your `db.commit()` so the audit entry and the real change are saved together in one transaction. Do not call it for requests that fail.
   - **Action names** are the `AuditAction` enum in `core/audit.py`. An unknown name raises `ValueError`, which catches typos. To add a new action, add one line to the enum.
-  - **Current actions:** `user.signup`, `user.login`, `user.password_reset_requested`, `user.password_reset`, `invite.created`, `invite.accepted`, `ticket.created`, `ticket.updated`, `ticket.status_changed`.
-  - **Already called from:** signup (`user.signup`), login (`user.login`), creating an invite (`invite.created`) and accepting an invite (`invite.accepted`).
+  - **Current actions:** `user.signup`, `user.login`, `user.password_reset_requested`, `user.password_reset`, `user.role_changed`, `user.deactivated`, `invite.created`, `invite.accepted`, `settings.sla_updated`, `ticket.created`, `ticket.updated`, `ticket.status_changed`.
+  - **Already called from:** signup (`user.signup`), login (`user.login`), creating an invite (`invite.created`), accepting an invite (`invite.accepted`), changing the SLA setting (`settings.sla_updated`), and changing a user's role or deactivating a user (`user.role_changed`, `user.deactivated`).
   - **Ticket events:** `entity_type="ticket"`, `entity_id=ticket.id`, `metadata` holds the changed fields, for example `{"status": ["new", "open"]}`.
   - **Never put secrets in `metadata`:** no passwords, tokens or invite links. Avoid emails and other personal data.
   - **Table columns:** `id`, `organization_id` (required), `actor_user_id` (nullable), `action`, `entity_type`, `entity_id`, `metadata` (JSONB), `created_at`. Index on `(organization_id, created_at)`.
@@ -178,9 +183,9 @@ it should always reflect the current, real contract, not the original plan.
 | `/tickets` | agent, admin, owner | implemented (Saqeeba, issue #13) |
 | `/tickets/:id` | n/a (opened from lists) | implemented (Saqeeba, issue #37) |
 | `/portal` | customer | placeholder |
-| `/settings` | admin, owner | placeholder |
-| `/settings/team` | admin, owner | placeholder |
-| `/audit-log` | admin, owner | placeholder |
+| `/settings` | admin, owner | placeholder (the SLA API exists, see item 11) |
+| `/settings/team` | admin, owner | placeholder (the team API exists, see item 12) |
+| `/audit-log` | admin, owner | implemented (issue #35) |
 
   - The guard only checks that the user is logged in. It does not check roles; the sidebar only hides links by role (`frontend/src/layout/navConfig.ts`). The backend is what enforces permissions on every endpoint.
   - To add a page: add the `<Route>` inside the protected layout block in `App.tsx`, and add one line to `NAV_ITEMS` in `navConfig.ts` if it needs a sidebar link. A public page goes next to `/login`, outside `ProtectedRoute`.

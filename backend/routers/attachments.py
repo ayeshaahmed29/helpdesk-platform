@@ -1,5 +1,6 @@
 import os
 import uuid
+from pathlib import PurePosixPath
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
@@ -18,14 +19,42 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 MAX_SIZE = 5 * 1024 * 1024  # 5 MB
-ALLOWED_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-    "application/pdf",
-    "text/plain",
+
+# Extension -> allowed content types
+ALLOWED_EXTENSIONS: dict[str, set[str]] = {
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".png": {"image/png"},
+    ".gif": {"image/gif"},
+    ".webp": {"image/webp"},
+    ".pdf": {"application/pdf"},
+    ".txt": {"text/plain"},
 }
+
+
+def _clean_filename(raw: str | None) -> str:
+    if not raw:
+        return "file"
+    name = PurePosixPath(raw).name
+    if not name or name.startswith("."):
+        return "file"
+    return name[:255]
+
+
+def _validate_file_type(filename: str, content_type: str | None) -> str:
+    ext = os.path.splitext(filename)[1].lower()
+    allowed_types = ALLOWED_EXTENSIONS.get(ext)
+    if allowed_types is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File extension '{ext}' is not allowed",
+        )
+    if content_type and content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Content type '{content_type}' does not match extension '{ext}'",
+        )
+    return ext
 
 
 @router.post(
@@ -33,7 +62,7 @@ ALLOWED_TYPES = {
     response_model=AttachmentRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def upload_attachment(
+def upload_attachment(
     ticket_id: int,
     file: UploadFile,
     db: DbSession,
@@ -41,13 +70,10 @@ async def upload_attachment(
 ):
     ticket = get_ticket_or_404(db, user, ticket_id)
 
-    if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type '{file.content_type}' is not allowed",
-        )
+    clean_name = _clean_filename(file.filename)
+    ext = _validate_file_type(clean_name, file.content_type)
 
-    contents = await file.read()
+    contents = file.file.read()
 
     if len(contents) > MAX_SIZE:
         raise HTTPException(
@@ -57,17 +83,16 @@ async def upload_attachment(
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    ext = os.path.splitext(file.filename or "file")[1]
     stored_name = f"{uuid.uuid4().hex}{ext}"
     storage_path = os.path.join(UPLOAD_DIR, stored_name)
 
-    with open(storage_path, "wb") as f:  # noqa: PTH123
+    with open(storage_path, "wb") as f:
         f.write(contents)
 
     attachment = Attachment(
         ticket_id=ticket.id,
         uploader_id=user.id,
-        filename=file.filename or "file",
+        filename=clean_name,
         content_type=file.content_type or "application/octet-stream",
         size=len(contents),
         storage_path=stored_name,
@@ -109,7 +134,6 @@ def download_attachment(
             status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found"
         )
 
-    # Org isolation through the ticket
     get_ticket_or_404(db, user, attachment.ticket_id)
 
     file_path = os.path.join(UPLOAD_DIR, attachment.storage_path)

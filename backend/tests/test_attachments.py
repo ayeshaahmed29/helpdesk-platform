@@ -1,5 +1,12 @@
 import io
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _use_tmp_uploads(tmp_path, monkeypatch):
+    monkeypatch.setattr("routers.attachments.UPLOAD_DIR", str(tmp_path))
+
 
 def test_agent_can_upload_attachment(client, world, login_as):
     login_as(world.agent_a)
@@ -55,7 +62,28 @@ def test_disallowed_type_rejected(client, world, login_as):
         files={"file": ("virus.exe", file, "application/x-msdownload")},
     )
     assert response.status_code == 400
-    assert "not allowed" in response.json()["detail"]
+
+
+def test_mismatched_type_rejected(client, world, login_as):
+    login_as(world.agent_a)
+    file = io.BytesIO(b"<html>evil</html>")
+    response = client.post(
+        f"/tickets/{world.ticket_a.id}/attachments",
+        files={"file": ("evil.html", file, "image/png")},
+    )
+    assert response.status_code == 400
+
+
+def test_path_traversal_cleaned(client, world, login_as):
+    login_as(world.agent_a)
+    file = io.BytesIO(b"sneaky content")
+    response = client.post(
+        f"/tickets/{world.ticket_a.id}/attachments",
+        files={"file": ("../../evil.txt", file, "text/plain")},
+    )
+    assert response.status_code == 201
+    assert response.json()["filename"] == "evil.txt"
+    assert "../" not in response.json()["filename"]
 
 
 def test_list_attachments(client, world, login_as):

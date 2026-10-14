@@ -29,6 +29,9 @@ class AuditAction(StrEnum):
     ticket_updated = "ticket.updated"
     ticket_status_changed = "ticket.status_changed"
 
+    # tickets (written by the SLA worker, actor_user_id is None)
+    ticket_sla_breached = "ticket.sla_breached"
+
 
 def log_audit_event(
     db: Session,

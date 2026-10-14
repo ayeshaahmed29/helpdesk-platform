@@ -24,6 +24,10 @@ class Ticket(Base):
     first_response_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Set once by the SLA worker when the first reply is overdue (NULL = not breached).
+    sla_breached_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

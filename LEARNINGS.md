@@ -1,4 +1,4 @@
-# Learnings
+﻿# Learnings
 
 ## Day 1 (Saqeeba)
 
@@ -64,7 +64,7 @@
 **How I fixed it:** Created the branch from the current commit with `git checkout -b`, then moved local main back with `git branch -f main origin/main`.
 **What I learned:** Always run `git branch` before committing to check which branch I am on.
 
-## Day 1–2 (Ayesha)
+## Day 1â€“2 (Ayesha)
 
 ### Problem: Duplicated and broken backend/Dockerfile
 **What happened:** The Dockerfile content was pasted twice, and the first CMD line ran directly into a second FROM line with no line break, which would fail to parse.
@@ -75,13 +75,13 @@
 **Found by:** CI (GitHub Actions)
 **What happened:** Unsorted imports, old-style `Union[X, Y]` typing, an unsorted `__all__`, and two real `F821 Undefined name` errors from forward-referenced model names (`"User"` in organization.py, `"Organization"` in user.py).
 **How I fixed it:** Ran `ruff check . --fix` for the style issues, and added `TYPE_CHECKING`-guarded imports to resolve the undefined-name errors properly instead of suppressing them.
-**What I learned:** Pylance and ruff both flag string-based forward references as undefined unless you add a `TYPE_CHECKING` import block — it's a false alarm at runtime but a real lint error in CI.
+**What I learned:** Pylance and ruff both flag string-based forward references as undefined unless you add a `TYPE_CHECKING` import block â€” it's a false alarm at runtime but a real lint error in CI.
 
 ### Problem: ruff not found inside the backend container
 **Found by:** Ayesha
 **What happened:** ruff is only installed as a step in the CI workflow, not part of requirements.txt, so it wasn't available inside the locally running container.
 **How I fixed it:** Ran `pip install ruff` inside the running container to check locally before pushing.
-**What I learned:** A dev-only tool used in CI won't exist locally unless it's also in requirements.txt (or a separate dev requirements file) — worth adding later so lint can be checked locally without extra steps.
+**What I learned:** A dev-only tool used in CI won't exist locally unless it's also in requirements.txt (or a separate dev requirements file) â€” worth adding later so lint can be checked locally without extra steps.
 
 ## Day 3 (Saqeeba)
 
@@ -580,7 +580,7 @@
 ### Issue #52, SLA policy setting and team management API
 
 ### What I did
-- Added `GET /settings/sla` and `PUT /settings/sla` (owner and admin). The value is validated to 1–168 and the company comes from the logged-in user.
+- Added `GET /settings/sla` and `PUT /settings/sla` (owner and admin). The value is validated to 1â€“168 and the company comes from the logged-in user.
 - Reused the existing column `organizations.sla_first_response_hours` instead of adding `sla_first_reply_hours`. It was already `NOT NULL` and every row had a value, so no migration was needed. The API field is called `first_reply_hours`.
 - Added `GET /users` and `PATCH /users/{id}` (owner and admin) with these rules: an admin cannot create or change an owner, nobody can demote or deactivate themselves, the last active owner is protected, and a user from another company returns 404.
 - Added the audit actions `settings.sla_updated`, `user.role_changed` and `user.deactivated`, and added them to `ACTIONS` in `AuditLog.tsx`.
@@ -599,3 +599,22 @@
 - Keep the field name of the API separate from the database column name. The API contract is the promise, and the column can keep its older name.
 - A rule that protects the last owner is a safety net. The other rules already make it hard to reach through the API, so the test has to set up the situation on purpose. Lock the other owner rows while counting, so two requests at the same moment cannot remove both.
 - A request with the same value should change nothing and write no audit entry, so the log only shows real changes.
+
+## Day 12 (Saqeeba)
+
+### Issue #60, basic search over tickets
+
+### What I did
+- Added a search query parameter to GET /tickets, matching case-insensitively against both subject and description using ilike with a percent-term-percent pattern.
+- Combined it with the existing status, priority, and assignee_id filters, so an agent can narrow down by keyword and status at the same time.
+- Wrote tests/test_ticket_search.py: subject match, description match, case-insensitivity, combining with a status filter, and confirming another company's matching tickets never appear.
+
+### Problem: broken indentation while editing the query filters
+Found by: Saqeeba (ruff SyntaxError: Expected an indented block)
+What happened: While adding the new search filter block next to the existing filters, an editor paste left one of the if statements with no indented body underneath it, and a later edit nested it one level too deep inside the wrong block instead of as a sibling if.
+How I fixed it: Replaced the whole list_tickets function in one block instead of patching it line by line, so all four filter if statements ended up at the same indentation level.
+What I learned: When an indentation error is hard to spot by eye, rewriting the whole function cleanly is faster and safer than chasing it line by line, especially in a block with several similar-looking if statements in a row.
+
+### Learned
+- A simple ilike pattern on both subject and description is enough for a first version of search; it doesn't need a separate search index yet at this scale.
+- Keeping the search filter as just another where clause on the same query object means it composes for free with every existing filter and with tenant isolation, since visible_tickets(user) is still the base query.

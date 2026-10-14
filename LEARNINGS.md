@@ -505,6 +505,75 @@
 - Ticket-tag relationships are many-to-many (via SQLAlchemy secondary)
 - All delete operations use ondelete='CASCADE' for data integrity
 - Customers cannot manage tags (403 on all write operations)
+## Day 11 (Saqeeba)
+
+### Issue #39 follow-up: case-insensitive duplicate tags and color validation
+
+### What I did
+- Ayesha found during her PR review that tag names were case-sensitive, so "Billing" and "billing" could both exist as separate tags in the same company.
+- Added a field_validator on TagCreate.name that lowercases and trims the name before it is saved, so the existing unique constraint on (organization_id, name) now actually catches duplicates regardless of case.
+- Added hex color validation on TagCreate.color with Field(pattern=r"^#[0-9a-fA-F]{6}$"), so a value like "banana" is rejected with 422 instead of being stored as-is.
+- Wrapped the tag creation db.commit() in a try/except for IntegrityError, returning 409 "A tag with this name already exists" instead of a raw 500.
+- Added two new tests: creating "Billing" then "billing" in the same company is rejected (409), and the same name in a different company is still allowed.
+
+### Problem: CI backend lint failing but passing locally
+**Found by:** Saqeeba (CI red, ruff check . green on my machine)
+**What happened:** My local ruff was 0.16.9, a newer version than whatever pip install ruff picked up in CI. The newer version catches more issues than the older one, so local and CI disagreed.
+**How I fixed it:** Pinned ruff to a specific version (ruff==0.11.12) in both requirements.txt and ci.yml, so local and CI always run the same linter version.
+**What I learned:** An unpinned dev dependency like a linter can silently drift between machines. Pin it the same way as any other dependency, especially one that gates CI.
+
+## Issue #40, file attachments on tickets
+
+### What I did
+- Added the Attachment model and migration: id, ticket_id, nullable comment_id, uploader_id, filename, content_type, size, storage_path, created_at.
+- Files are stored on disk inside the backend container, in an uploads/ folder backed by a named Docker volume, so uploads survive a container restart (but not a volume wipe).
+- Built POST /tickets/{id}/attachments (multipart upload, 5 MB limit), GET /tickets/{id}/attachments, and GET /attachments/{id}/download. Access is scoped to the user's organization through the ticket, same pattern as comments and tags.
+- Wrote tests/test_attachments.py: upload by agent and customer, other org blocked (404) on upload/download/list, oversized file rejected, disallowed type rejected, list and download work.
+
+### Problem: python-multipart not installed
+**Found by:** Saqeeba (pytest and Swagger both failed with RuntimeError: Form data requires "python-multipart" to be installed)
+**What happened:** FastAPI needs python-multipart to parse UploadFile form data, and it was never added to requirements.txt.
+**How I fixed it:** Added python-multipart to requirements.txt and rebuilt the backend image.
+**What I learned:** File upload endpoints have a dependency that isn't obvious from the FastAPI code itself; it only shows up the first time a multipart request actually hits the server.
+
+### Problem: content type lied about by the client was trusted
+**Found by:** Ayesha (PR review): uploading a file named evil.html with content_type: image/png was accepted and stored as if it really were a PNG.
+**What happened:** The upload only checked the content_type the client claims in the multipart request, never the file's real extension or its bytes.
+**How I fixed it:** Added a table mapping each allowed extension to its expected content type, and reject the upload (400) if the extension isn't in the table or doesn't match the declared type. The stored extension is derived from the validated type, not the client's filename.
+**What I learned:** Never trust a client-supplied content_type header as the only gate. At minimum, cross-check it against the file extension.
+
+### Problem: unsanitized filename stored and echoed back
+**Found by:** Ayesha (PR review): uploading a file named ../../evil.txt stored that exact string and returned it in the download's content-disposition header.
+**What happened:** The original filename from the client was saved and reused as-is, even though the actual file on disk already used a random UUID name.
+**How I fixed it:** Added a _clean_filename helper that keeps only the last path segment, caps the length, and falls back to "file" for an empty name. The cleaned name is what's stored and returned.
+**What I learned:** Even when the file itself is stored safely under a random name, the human-readable filename is still untrusted input the moment it touches a path or a header.
+
+### Problem: tests wrote real files into the real uploads/ folder
+**Found by:** Ayesha (PR review): after running pytest, six stray files were sitting in the real uploads/ directory with no matching database row.
+**What happened:** Tests use a separate test database, but the upload code always wrote to the same UPLOAD_DIR as the real app.
+**How I fixed it:** Added an autouse pytest fixture using tmp_path and monkeypatch.setattr("routers.attachments.UPLOAD_DIR", str(tmp_path)), so each test run gets its own throwaway folder that pytest cleans up automatically.
+**What I learned:** A test database being isolated doesn't mean the whole test is isolated. Anything that touches the filesystem needs its own test-only target too.
+
+### Problem: blocking file write inside an async endpoint
+**Found by:** Ayesha (PR review, ruff ASYNC230)
+**What happened:** The upload route was declared async def but used a plain blocking open(...).write(...) call inside it, which would block the event loop while the file was being written.
+**How I fixed it:** Changed the endpoint to a plain def, which FastAPI already runs in a thread pool, so the blocking write no longer blocks the event loop.
+**What I learned:** async def is a promise that the function won't block. If the body does blocking I/O, either use a real sync def or move the blocking part into a thread.
+
+### Bug fix: tags disappearing from a ticket after refresh
+
+**Found by:** Ayesha (during PR #56 review)
+**What happened:** Adding a tag to a ticket showed the tag chip correctly right away, but refreshing the page, or navigating back to the ticket list and reopening the ticket, made the tag disappear.
+**Cause:** TicketRead in schemas/ticket.py never had a tags field, even though the Ticket model already had a tags relationship. GET /tickets/{id} therefore never returned tags, so there was nothing for the frontend to show after a fresh page load.
+**How I fixed it:** Added tags: list[TagRead] = [] to TicketRead.
+**What I learned:** A relationship existing on the SQLAlchemy model doesn't mean it's exposed over the API. The Pydantic response schema is the real contract.
+
+### Bug fix: duplicate tags_router include in main.py
+
+**Found by:** Ayesha (PR #57 review notes)
+**What happened:** app.include_router(tags_router) appeared twice in main.py, left over from an earlier merge where both branches added their own include line for tags.
+**How I fixed it:** Removed the duplicate line.
+**What I learned:** After resolving a merge conflict in a file that's mostly a list of near-identical lines, do a quick visual scan of the final result, not just a check that it runs.
 
 ## Day 11 (Ayesha)
 

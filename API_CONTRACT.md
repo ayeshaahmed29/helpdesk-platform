@@ -196,4 +196,119 @@ it should always reflect the current, real contract, not the original plan.
 - **How:** Code: `backend/routers/invites.py`, schemas in `backend/schemas/invites.py`, model `backend/models/invite.py`. Frontend: `frontend/src/pages/AcceptInvite.tsx` and `frontend/src/api/invites.ts`.
   - `POST /invites` (owner or admin). Body: `{ "email", "role" }` where `role` is `customer`, `agent`, `admin` or `owner`. Returns **201** `{ id, email, role, status, invited_by, expires_at, accepted_at, created_at }`. The token is **never** returned; it exists only in the email link.
     - An **admin** cannot invite an `owner` (403). An owner can invite any role.
-    - **409** if a user with this email already exists (in any company, because emails are unique), or if this company already has a pending invite for the email.
+    - **409** if a user with this email already exists (in any company, because emails are unique), or if this company already has a pending invite for the email. An expired or used invite does not block a new one.
+    - **502** if the email could not be sent. Nothing is saved in that case, so the request can simply be repeated.
+    - The email is saved lowercase. Agents and customers get **403**.
+  - `GET /invites` (owner or admin). Returns a list of the user's own company invites, newest first, each with `status`: `pending`, `accepted` or `expired`. No pagination yet.
+  - `GET /invites/{token}` (public). Returns `{ email, role, organization_name, expires_at }` so the accept page can show who is inviting. **404** for an unknown token, **410** if it was already used or has expired.
+  - `POST /invites/{token}/accept` (public). Body: `{ "full_name" (1–100), "password" (8–128) }`. Returns **201** with the new user (same shape as signup). Same **404** / **410** errors as above, **409** if the email was registered in the meantime, **422** for bad input. A failed attempt (for example a short password) does not use up the invite.
+    - It does **not** log the user in. The user goes to `/login` afterwards.
+  - **Token rules:** `secrets.token_urlsafe(32)`, valid for **7 days**, usable **once**. Only the **SHA-256 hash** is stored (`invites.token_hash`, unique). The accept call locks the invite row, so two requests at the same moment cannot both succeed.
+  - **Link in the email:** `FRONTEND_URL` + `/accept-invite/<token>`.
+  - **Table `invites`:** `id`, `email`, `role` (lowercase string), `organization_id` (FK), `invited_by` (FK to users, `SET NULL`), `token_hash`, `expires_at`, `accepted_at` (NULL while pending), `created_at`.
+  - **Audit:** `invite.created` (actor = inviter) and `invite.accepted` (actor = the new user), both with `entity_type="invite"`, `entity_id` = invite id and `metadata={"role": ...}`. No email address or token is logged.
+  - **Tests:** `backend/tests/test_invites.py` (success, role rules, duplicates, existing members, failed email, expired, reused, invalid token, audit entries).
+- **Status:** Implemented (issue #31)
+
+### 9. Password Reset (Forgot & Reset Password)
+- **What:** Allows users to request a password reset email using their registered email address and complete the reset using a secure token.
+- **How:** Code: `backend/routers/auth.py`, schemas in `backend/schemas/auth.py`. Frontend: `frontend/src/pages/ForgotPasswordPage.tsx`, `frontend/src/pages/ResetPasswordPage.tsx`, and `frontend/src/api/auth.ts`.
+  - `POST /auth/forgot-password` (public). Body: `{ "email": "user@example.com" }`. Returns **200** with a generic success message (e.g., instructions sent) to prevent user enumeration.
+    - Stored lowercase email lookup.
+    - Triggers an email containing a link with the secure token (`FRONTEND_URL` + `/reset-password?token=<token>`).
+    - Audit log: `user.password_reset_requested`.
+  - `POST /auth/reset-password` (public). Body: `{ "token": "string", "new_password": "at-least-8-characters" }`. Returns **200** on success.
+    - Validates token expiration and single-use constraints.
+    - Updates the user password hash (argon2).
+    - Audit log: `user.password_reset`.
+  - **Security Rules:** Tokens are securely hashed, short-lived, and invalidated after successful use.
+- **Status:** Implemented
+
+---
+
+## Saqeeba provides → Ayesha consumes
+
+### 1. Ticket fields: `first_response_at` and `status`
+- **What:** Needed by the SLA background job to detect overdue tickets
+- **How:** Columns on the
+
+
+## Comments (#38)
+
+### POST /tickets/{ticket_id}/comments
+Create a comment on a ticket. Both staff and customers can post.
+
+Body:
+
+{
+"body": "string (required)",
+"is_internal": false
+}
+
+
+Rules:
+- Customers cannot set `is_internal: true` (returns 403).
+- Customers never see internal notes in GET.
+- First public staff reply (not internal) sets the ticket's `first_response_at`.
+
+Response: 201 with the created comment.
+
+### GET /tickets/{ticket_id}/comments
+List comments on a ticket, oldest first.
+- Customers see only public comments (never internal).
+- Staff see all comments including internal notes.
+Response: 200 with a list of comments.
+
+## Tags (New - Issue #39)
+
+### POST /tags
+Create a new tag (agent+ only)
+- Request: `{"name": "urgent", "color": "red"}`
+- Response: 201 TagRead
+- Error: 403 if customer
+
+### GET /tags
+List all tags in user's organization
+- Response: 200 list[TagRead]
+
+### DELETE /tags/{tag_id}
+Delete a tag (agent+ only)
+- Response: 204
+- Error: 403 if customer, 404 if not found
+
+### POST /tags/{tag_id}/tickets/{ticket_id}
+Add tag to ticket (agent+ only)
+- Response: 204
+- Error: 403 if customer, 404 if tag/ticket not found
+
+### DELETE /tags/{tag_id}/tickets/{ticket_id}
+Remove tag from ticket (agent+ only)
+- Response: 204
+- Error: 403 if customer, 404 if tag/ticket not found
+## Attachments (Issue #40)
+
+### POST /tickets/{ticket_id}/attachments
+Upload a file attachment to a ticket (multipart/form-data).
+- Field: file (the file to upload)
+- Allowed types: images (jpeg, png, gif, webp), pdf, txt - validated against the file's extension AND its declared content type, not just one or the other
+- Max size: 5 MB
+- Response: 201 AttachmentRead
+- Error: 400 if type/size invalid, 404 if ticket not in user's org
+
+### GET /tickets/{ticket_id}/attachments
+List attachments on a ticket, oldest first.
+- Response: 200 list[AttachmentRead]
+- Error: 404 if ticket not in user's org
+
+### GET /attachments/{attachment_id}/download
+Download an attachment's file.
+- Response: 200 file stream (original filename, correct content type)
+- Error: 404 if attachment not in user's org, or if the file is missing on disk
+
+### GET /tickets/{id} now includes tags
+TicketRead responses include a tags field:
+[{"id": 1, "name": "urgent", "color": "#ff0000", "organization_id": 1, "created_at": "..."}]
+
+### Tag validation update (Issue #39 follow-up)
+- Tag names are lowercased and trimmed before saving, so "Billing" and "billing" are treated as the same tag within a company (409 on duplicate).
+- Tag color must be a hex code matching ^#[0-9a-fA-F]{6}$, or null. Any other value returns 422.

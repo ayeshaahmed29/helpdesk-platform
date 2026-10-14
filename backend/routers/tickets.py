@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user
@@ -100,6 +100,7 @@ def list_tickets(
     status_filter: Annotated[TicketStatus | None, Query(alias="status")] = None,
     priority: Priority | None = None,
     assignee_id: int | None = None,
+    search: Annotated[str | None, Query(min_length=1, max_length=255)] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
@@ -111,6 +112,11 @@ def list_tickets(
         query = query.where(Ticket.priority == priority)
     if assignee_id is not None:
         query = query.where(Ticket.assignee_id == assignee_id)
+    if search is not None:
+        term = f"%{search}%"
+        query = query.where(
+            or_(Ticket.subject.ilike(term), Ticket.description.ilike(term))
+        )
 
     total = db.scalar(select(func.count()).select_from(query.subquery()))
 
@@ -121,6 +127,7 @@ def list_tickets(
     ).all()
 
     return TicketListResponse(items=items, total=total, page=page, page_size=page_size)
+
 
 @router.get("/{ticket_id}", response_model=TicketRead)
 def get_ticket(ticket_id: int, db: DbSession, user: CurrentUser):

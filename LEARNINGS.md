@@ -618,3 +618,68 @@ What I learned: When an indentation error is hard to spot by eye, rewriting the 
 ### Learned
 - A simple ilike pattern on both subject and description is enough for a first version of search; it doesn't need a separate search index yet at this scale.
 - Keeping the search filter as just another where clause on the same query object means it composes for free with every existing filter and with tenant isolation, since visible_tickets(user) is still the base query.
+
+## Day 12 (Ayesha)
+
+### Issue #53, SLA background job and overdue alerts
+
+### What I did
+- Added a nullable column `tickets.sla_breached_at` with a migration (parent `ecbbd1e319cb`). Nullable means no backfill is needed: NULL is "not breached". Tested upgrade, downgrade and upgrade again, plus `alembic heads` and `alembic check`.
+- Wrote the logic as a plain function, `run_sla_check(db, now)` in `core/sla.py`. It finds tickets with no first reply, not resolved or closed, not flagged yet, and older than their own company's SLA hours. For each one it sets `sla_breached_at` and writes the audit entry `ticket.sla_breached` with no actor.
+- Emails the active owners and admins of the company with `send_email`. A failed email is caught (`EmailSendError`), logged, and does not stop the rest of the run.
+- Added a separate `worker` service in `docker-compose.yml` that runs `worker.py`: a loop that runs the check every `SLA_CHECK_INTERVAL_SECONDS` (default 300). A Redis lock keeps two workers from running at the same time.
+- Added `ticket.sla_breached` to the `AuditAction` enum and to `ACTIONS` in `AuditLog.tsx`.
+- Added `SLA_CHECK_INTERVAL_SECONDS` to `.env.example`.
+- Wrote `tests/test_sla_job.py` (11 test cases): breached ticket flagged and emailed, only owners and admins emailed, audit entry without actor, ticket with a first reply ignored, resolved and closed ignored, ticket still inside the SLA ignored, no second email on a second run, each company uses its own SLA hours, inactive admin not emailed, one failed email does not stop the run.
+- Checked in Mailpit that the alert arrives, and on the audit log page that it shows "System" as the actor.
+- Told Saqeeba about the new column on her table, and updated `API_CONTRACT.md` (new item 13, restored items 10 to 12, fixed the Mailpit port and her item 1).
+
+### Learned
+- A simple loop in a separate container is enough for a job that runs every few minutes. APScheduler would only add a new package and a rebuild. The Docker service and `restart: unless-stopped` already give us the "keep it running" part.
+- Keep the logic (`core/sla.py`) apart from the loop (`worker.py`). The loop needs Redis and a clock, the logic does not, so tests can call `run_sla_check(db, now)` with any `now` and need neither Redis nor waiting.
+- Flag first, email second. The flag and the audit entry are committed before any email is sent, so no database lock is held while waiting for SMTP, and a broken mail server can never undo a flag. The cost: a failed alert is not retried, but the audit log still shows the breach.
+- `FOR UPDATE SKIP LOCKED` is a second safety on top of the Redis lock. If two runs ever overlap, each ticket is taken by only one of them, so nobody gets a duplicate email.
+- Only the ticket number goes into the email subject. A ticket subject typed by a user could contain a line break, and a line break in an email header breaks the email. User text belongs in the body.
+- Check the database before adding a column to someone else's table, and tell the owner. `tickets` is Saqeeba's table, so she gets a message with the column name, the migration id and who writes to it.
+- A ticket that gets its first reply after it was flagged keeps `sla_breached_at`. The SLA was already missed, and this keeps the history true.
+- The first run on a database with old tickets flags all of them at once. This is correct, but it surprises you when you test, so it is documented in the contract.
+
+## Day 13 (Ayesha)
+
+### Issue #54, admin settings and team pages
+
+### What I did
+- Replaced the `/settings` placeholder with an SLA form: number input, validation (whole number, 1 to 168), loading state, "Try again" when loading fails, and success and error messages.
+- Replaced the `/settings/team` placeholder with a members table (name, email, role, status), a role dropdown, a deactivate confirm dialog and a reactivate button.
+- Showed only the roles the current user may assign: an owner sees all four, an admin does not see "owner".
+- Disabled the actions on my own row, on owner rows when I am an admin, and on the last active owner. The reason shows when hovering over the disabled control.
+- Added an invite form and a list of pending invites to the team page, using the existing `POST /invites` and `GET /invites`.
+- Added `api/settings.ts`, `api/users.ts`, `api/errors.ts` and `auth/roles.ts`, and added `createInvite` and `listInvites` to `api/invites.ts`.
+- Added `ConfirmDialog` and `InviteSection` components.
+- Checked that login and signup pages and `login()` in `AuthContext` already existed, so nothing was rebuilt.
+- Updated `API_CONTRACT.md`.
+
+### Problem: the UI could not show the real reason for a 403
+**Found by:** Ayesha (while planning the team page)
+**What happened:** `PATCH /users/{id}` has three different 403 reasons (an admin changing an owner, an admin making an owner, and changing yourself) and a 409 for the last owner. But `apiFetch` only threw `ApiError(status, "Request failed: 403")` and threw away the backend's `detail`, so the page could only show one generic message.
+**How I fixed it:** `apiFetch` now reads `detail` from the JSON error body when it is a string and stores it as `ApiError.detail`. `message` and `status` stay the same, so older pages work as before. A new `apiErrorMessage()` helper shows the backend's own text for 403 and 409.
+**What I learned:** If the backend sends a precise reason, the shared API client must pass it on. Otherwise every page ends up with the same vague message. 422 errors send a list in `detail`, not a string, so those need their own text.
+
+### Problem: the API contract described the password reset link wrongly
+**Found by:** Ayesha (checking `routers/auth.py` against `App.tsx`)
+**What happened:** The contract said the reset email link is `/reset-password?token=<token>`. The real code builds `/reset-password/<token>`, and `App.tsx` has the route `/reset-password/:token`, so the code was right and the document was wrong. The contract also said `forgot-password` returns 200, but it returns 202.
+**How I fixed it:** Corrected both lines in `API_CONTRACT.md` and checked the real code first, so I did not change working code for no reason.
+**What I learned:** When a document and the code disagree, read the code first to see which one is wrong. Contract text written before the code is finished can go out of date.
+
+### Problem: the contract file had lost items
+**Found by:** Ayesha (when I updated it for this issue)
+**What happened:** The copy of `API_CONTRACT.md` I started from was missing items 10 to 13 and the `ticket.sla_breached` action, and Saqeeba's item 1 was cut off in the middle of a sentence. It was most likely lost in a merge or rebase conflict on a shared file.
+**How I fixed it:** Rebuilt the file from the last complete version, kept Saqeeba's newer sections (search) and checked the final `git diff`.
+**What I learned:** After resolving a conflict in a shared document, read the final result, not only the conflict area. Check the diff against main before pushing a docs change.
+
+### Learned
+- The UI only hides things. I tested the real rule by calling `PATCH /users/{owner_id}` as an admin in Swagger, and the backend answered 403.
+- Compute the "last active owner" lock from the loaded users (count of active owners is 1) and still handle the 409 from the server, because two admins can act at the same moment.
+- After a 403, 404 or 409 the page loads the team again, because the data on screen may be out of date.
+- To avoid setting state directly inside an effect (the lint rule), set state in the promise callbacks and use a reload key, like the audit log page.
+- Hover text (`title`) on disabled controls tells the user why an action is locked, which is better than a silent grey button.

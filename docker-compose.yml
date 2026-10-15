@@ -34,6 +34,18 @@ services:
       - ./backend:/app
       - uploads:/app/uploads
 
+  worker:
+    build: ./backend
+    command: python -u worker.py
+    env_file: .env
+    depends_on:
+      - db
+      - redis
+      - mailpit
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+
   frontend:
     build: ./frontend
     depends_on:

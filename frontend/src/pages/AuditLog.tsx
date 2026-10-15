@@ -19,6 +19,7 @@ const ACTIONS = [
   "ticket.created",
   "ticket.updated",
   "ticket.status_changed",
+  "ticket.sla_breached",
 ];
 const PAGE_SIZE = 20;
 

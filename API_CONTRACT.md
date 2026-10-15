@@ -312,3 +312,11 @@ TicketRead responses include a tags field:
 ### Tag validation update (Issue #39 follow-up)
 - Tag names are lowercased and trimmed before saving, so "Billing" and "billing" are treated as the same tag within a company (409 on duplicate).
 - Tag color must be a hex code matching ^#[0-9a-fA-F]{6}$, or null. Any other value returns 422.
+## Search (Issue #60)
+
+### GET /tickets?search=<term>
+Adds case-insensitive, partial-match search over tickets.
+- Matches against both subject and description
+- Combines with existing filters: status, priority, assignee_id
+- Omit the parameter to get all tickets as before (unchanged behavior)
+- Example: GET /tickets?search=order&status=open returns only open tickets whose subject or description contains order

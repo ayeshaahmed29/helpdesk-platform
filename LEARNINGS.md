@@ -599,3 +599,22 @@
 - Keep the field name of the API separate from the database column name. The API contract is the promise, and the column can keep its older name.
 - A rule that protects the last owner is a safety net. The other rules already make it hard to reach through the API, so the test has to set up the situation on purpose. Lock the other owner rows while counting, so two requests at the same moment cannot remove both.
 - A request with the same value should change nothing and write no audit entry, so the log only shows real changes.
+
+## Day 12 (Saqeeba)
+
+### Issue #60, basic search over tickets
+
+### What I did
+- Added a search query parameter to GET /tickets, matching case-insensitively against both subject and description using ilike with a percent-term-percent pattern.
+- Combined it with the existing status, priority, and assignee_id filters, so an agent can narrow down by keyword and status at the same time.
+- Wrote tests/test_ticket_search.py: subject match, description match, case-insensitivity, combining with a status filter, and confirming another company's matching tickets never appear.
+
+### Problem: broken indentation while editing the query filters
+Found by: Saqeeba (ruff SyntaxError: Expected an indented block)
+What happened: While adding the new search filter block next to the existing filters, an editor paste left one of the if statements with no indented body underneath it, and a later edit nested it one level too deep inside the wrong block instead of as a sibling if.
+How I fixed it: Replaced the whole list_tickets function in one block instead of patching it line by line, so all four filter if statements ended up at the same indentation level.
+What I learned: When an indentation error is hard to spot by eye, rewriting the whole function cleanly is faster and safer than chasing it line by line, especially in a block with several similar-looking if statements in a row.
+
+### Learned
+- A simple ilike pattern on both subject and description is enough for a first version of search; it doesn't need a separate search index yet at this scale.
+- Keeping the search filter as just another where clause on the same query object means it composes for free with every existing filter and with tenant isolation, since visible_tickets(user) is still the base query.

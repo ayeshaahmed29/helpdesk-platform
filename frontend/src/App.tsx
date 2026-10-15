@@ -8,7 +8,9 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Placeholder from "./pages/Placeholder";
 import ResetPassword from "./pages/ResetPassword";
+import Settings from "./pages/Settings";
 import Signup from "./pages/Signup";
+import Team from "./pages/Team";
 import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
 
@@ -26,8 +28,8 @@ export default function App() {
           <Route path="/tickets" element={<TicketList />} />
           <Route path="/tickets/:id" element={<TicketDetail />} />
           <Route path="/portal" element={<Placeholder title="My tickets" />} />
-          <Route path="/settings" element={<Placeholder title="Settings" />} />
-          <Route path="/settings/team" element={<Placeholder title="Team" />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/team" element={<Team />} />
           <Route path="/audit-log" element={<AuditLog />} />
         </Route>
       </Route>

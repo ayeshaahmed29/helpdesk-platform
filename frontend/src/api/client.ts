@@ -12,10 +12,14 @@ export function clearToken(): void {
 
 export class ApiError extends Error {
   status: number;
+  // The "detail" text from the backend, when it is a plain string.
+  // Validation errors (422) send a list, so detail stays undefined for them.
+  detail?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, detail?: string) {
     super(message);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -50,7 +54,18 @@ export async function apiFetch<T = unknown>(
       clearToken();
       onUnauthorized?.();
     }
-    throw new ApiError(response.status, `Request failed: ${response.status}`);
+
+    // Keep the backend's message, so pages can show it (for example the
+    // different 403 reasons on PATCH /users/{id}).
+    let detail: string | undefined;
+    try {
+      const body = await response.json();
+      if (typeof body?.detail === "string") detail = body.detail;
+    } catch {
+      // the error response had no JSON body
+    }
+
+    throw new ApiError(response.status, `Request failed: ${response.status}`, detail);
   }
 
   // Some endpoints (e.g. logout) may return an empty body.

@@ -113,9 +113,15 @@ def list_tickets(
     if assignee_id is not None:
         query = query.where(Ticket.assignee_id == assignee_id)
     if search is not None:
-        term = f"%{search}%"
+        escaped = (
+            search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        )
+        term = f"%{escaped}%"
         query = query.where(
-            or_(Ticket.subject.ilike(term), Ticket.description.ilike(term))
+            or_(
+                Ticket.subject.ilike(term, escape="\\"),
+                Ticket.description.ilike(term, escape="\\"),
+            )
         )
 
     total = db.scalar(select(func.count()).select_from(query.subquery()))
@@ -127,7 +133,6 @@ def list_tickets(
     ).all()
 
     return TicketListResponse(items=items, total=total, page=page, page_size=page_size)
-
 
 @router.get("/{ticket_id}", response_model=TicketRead)
 def get_ticket(ticket_id: int, db: DbSession, user: CurrentUser):

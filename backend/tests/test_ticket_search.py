@@ -30,13 +30,17 @@ def test_search_is_case_insensitive(client, world, login_as):
 
 def test_search_combines_with_status_filter(client, world, login_as):
     login_as(world.agent_a)
-    client.post("/tickets", json={"subject": "Login problem", "description": "cannot sign in"})
+    create = client.post(
+        "/tickets", json={"subject": "Login problem", "description": "cannot sign in"}
+    )
+    ticket_id = create.json()["id"]
+    client.patch(f"/tickets/{ticket_id}", json={"status": "open"})
 
-    response = client.get("/tickets?search=login&status=new")
+    response = client.get("/tickets?search=login&status=open")
     assert response.status_code == 200
     assert response.json()["total"] == 1
 
-    response = client.get("/tickets?search=login&status=resolved")
+    response = client.get("/tickets?search=login&status=new")
     assert response.status_code == 200
     assert response.json()["total"] == 0
 
@@ -46,15 +50,20 @@ def test_search_other_org_not_matched(client, world, login_as):
     client.post("/tickets", json={"subject": "Shared keyword ticket", "description": "test"})
 
     login_as(world.agent_b)
+    client.post("/tickets", json={"subject": "Shared keyword ticket", "description": "test"})
+
     response = client.get("/tickets?search=shared keyword")
     assert response.status_code == 200
-    assert response.json()["total"] == 0
+    assert response.json()["total"] == 1
 
 
 def test_no_search_returns_all(client, world, login_as):
     login_as(world.agent_a)
     response = client.get("/tickets")
     assert response.status_code == 200
+    assert response.json()["total"] == 2
+
+
 def test_percent_literal_in_term_is_escaped(client, world, login_as):
     login_as(world.agent_a)
     client.post("/tickets", json={"subject": "100% wrong item", "description": "defective"})
@@ -149,3 +158,43 @@ def test_total_counts_all_matches_not_just_current_page(client, world, login_as)
     data = response.json()
     assert len(data["items"]) == 1
     assert data["total"] == 2
+
+
+def test_search_combines_with_priority_filter(client, world, login_as):
+    login_as(world.agent_a)
+    client.post("/tickets", json={"subject": "Order problem", "description": "x"})
+
+    response = client.get("/tickets?search=order&priority=normal")
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+    response = client.get("/tickets?search=order&priority=urgent")
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+
+
+def test_search_combines_with_assignee_filter(client, world, login_as):
+    login_as(world.agent_a)
+    create = client.post("/tickets", json={"subject": "Order problem", "description": "x"})
+    ticket_id = create.json()["id"]
+    client.patch(f"/tickets/{ticket_id}", json={"assignee_id": world.agent_a.id})
+
+    response = client.get(f"/tickets?search=order&assignee_id={world.agent_a.id}")
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+    response = client.get(f"/tickets?search=order&assignee_id={world.agent_b.id}")
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+
+
+def test_single_space_search_is_treated_as_empty(client, world, login_as):
+    login_as(world.agent_a)
+    before = client.get("/tickets").json()["total"]
+
+    client.post("/tickets", json={"subject": "Order one", "description": "x"})
+    client.post("/tickets", json={"subject": "Something else", "description": "y"})
+
+    response = client.get("/tickets?search=%20")
+    assert response.status_code == 200
+    assert response.json()["total"] == before + 2

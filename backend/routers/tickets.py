@@ -112,9 +112,9 @@ def list_tickets(
         query = query.where(Ticket.priority == priority)
     if assignee_id is not None:
         query = query.where(Ticket.assignee_id == assignee_id)
-    if search is not None:
+    if search is not None and search.strip():
         escaped = (
-            search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         )
         term = f"%{escaped}%"
         query = query.where(

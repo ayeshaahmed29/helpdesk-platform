@@ -618,3 +618,25 @@ What I learned: When an indentation error is hard to spot by eye, rewriting the 
 ### Learned
 - A simple ilike pattern on both subject and description is enough for a first version of search; it doesn't need a separate search index yet at this scale.
 - Keeping the search filter as just another where clause on the same query object means it composes for free with every existing filter and with tenant isolation, since visible_tickets(user) is still the base query.
+
+## Day 14 (Saqeeba)
+
+### Issue #62, customer portal
+
+### What I did
+- Added a createTicket function to api/tickets.ts, since the project only had listTickets, getTicket, and updateTicket until now.
+- Built the /portal page: a form to submit a new ticket with subject and description, plus a list of the customer's own tickets below it, reusing the existing listTickets call (customers already only see their own tickets, since that is enforced in the backend).
+- Replaced the /portal placeholder route in App.tsx with the real page.
+- Client side validation blocks submitting with an empty subject or description, with a clear message, before the request is even sent.
+- After a successful submission, the form clears, a success message with the new ticket number shows, and the ticket list refreshes to include it immediately.
+
+### Problem: stale Vite build showed the old placeholder page
+Found by: Saqeeba (the browser kept showing This page is coming soon after the route was already updated in App.tsx)
+What happened: The file inside the frontend container had the new route, confirmed with a grep inside the container, but the running Vite dev server and the browser were both still serving the old bundle.
+How I fixed it: Restarted the frontend container and did a hard refresh in the browser.
+What I learned: This is the same class of problem noted on earlier days. When a route or page looks wrong right after an edit, check the file inside the container first, then restart the frontend container and hard refresh, before assuming the code itself is wrong.
+
+### Learned
+- Reviewing my own new code before asking for review caught two real issues before they reached anyone else: a missing React import for the form event type, and a hand rolled numeric cache key for the data fetch that could in theory collide, replaced with the same string template key pattern used elsewhere in the app.
+- Manually testing with a real customer account end to end, submit a ticket, see it in the list, open its detail page, trigger the empty-form validation, confirmed the whole flow works, not just that it compiles.
+- Verified the backend side directly in Swagger as a customer: creating a ticket, listing only that customer's own tickets, and getting a 404 for a ticket that belongs to someone else. No backend changes were needed for this issue, since tenant isolation and the existing endpoints already covered it from Week 1.

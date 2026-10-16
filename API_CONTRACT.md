@@ -320,3 +320,6 @@ Adds case-insensitive, partial-match search over tickets.
 - Combines with existing filters: status, priority, assignee_id
 - Omit the parameter to get all tickets as before (unchanged behavior)
 - Example: GET /tickets?search=order&status=open returns only open tickets whose subject or description contains order
+
+## Customer portal (Issue #62)
+No new backend endpoints. The /portal page on the frontend reuses the existing POST /tickets and GET /tickets endpoints, which already scope a customer to their own tickets only (see the Saqeeba provides section, Ticket fields item, and the tenant isolation tests from Week 1).

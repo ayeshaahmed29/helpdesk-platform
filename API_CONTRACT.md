@@ -477,6 +477,8 @@ Adds case-insensitive, partial-match search over tickets.
 
 - Example: GET /tickets?search=order&status=open returns only open tickets whose subject or description contains order
 
+## Customer portal (Issue #62)
+No new backend endpoints. The /portal page on the frontend reuses the existing POST /tickets and GET /tickets endpoints, which already scope a customer to their own tickets only (see the Saqeeba provides section, Ticket fields item, and the tenant isolation tests from Week 1).
 ## Reports (Issue #61)
 
 ### GET /reports/tickets-per-day

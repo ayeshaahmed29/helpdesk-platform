@@ -31,6 +31,19 @@ export interface TicketFilters {
   pageSize?: number;
 }
 
+export interface TicketCreate {
+  subject: string;
+  description: string;
+}
+
+export function createTicket(data: TicketCreate): Promise<Ticket> {
+  return apiFetch<Ticket>("/tickets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
 export function listTickets(filters: TicketFilters = {}): Promise<TicketPage> {
   const params = new URLSearchParams();
   if (filters.status) params.set("status", filters.status);

@@ -3,11 +3,11 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./layout/Layout";
 import AcceptInvite from "./pages/AcceptInvite";
 import AuditLog from "./pages/AuditLog";
-import ReportsDashboard from "./pages/ReportsDashboard";
+import CustomerPortal from "./pages/CustomerPortal";
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
-import Placeholder from "./pages/Placeholder";
+import ReportsDashboard from "./pages/ReportsDashboard";
 import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import Signup from "./pages/Signup";
@@ -28,7 +28,7 @@ export default function App() {
           <Route index element={<Navigate to="/tickets" replace />} />
           <Route path="/tickets" element={<TicketList />} />
           <Route path="/tickets/:id" element={<TicketDetail />} />
-          <Route path="/portal" element={<Placeholder title="My tickets" />} />
+          <Route path="/portal" element={<CustomerPortal />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/team" element={<Team />} />
           <Route path="/audit-log" element={<AuditLog />} />

@@ -323,3 +323,19 @@ Adds case-insensitive, partial-match search over tickets.
 
 ## Customer portal (Issue #62)
 No new backend endpoints. The /portal page on the frontend reuses the existing POST /tickets and GET /tickets endpoints, which already scope a customer to their own tickets only (see the Saqeeba provides section, Ticket fields item, and the tenant isolation tests from Week 1).
+## Reports (Issue #61)
+
+### GET /reports/tickets-per-day
+Returns the count of tickets created per day, for the user's own company.
+- Response: {"items": [{"day": "2026-10-15", "count": 3}, ...]}
+- Optional filters: date_from, date_to (both YYYY-MM-DD, whole days in UTC, date_to is inclusive)
+- Staff only (agent, admin, owner). Customers get 403.
+- Error: 400 if date_from is after date_to; 422 if a date is not in YYYY-MM-DD format
+
+### GET /reports/avg-first-response
+Returns the average time between a ticket being created and its first reply, for the user's own company.
+- Response: {"average_hours": 3.5, "ticket_count": 12}
+- Tickets with no first_response_at yet are excluded from the average
+- average_hours is null and ticket_count is 0 when no tickets match
+- Optional filters: date_from, date_to (same rules as tickets-per-day, filtered by the ticket's created_at)
+- Staff only (agent, admin, owner). Customers get 403.

@@ -1,4 +1,4 @@
-# Learnings
+﻿# Learnings
 
 ## Day 1 (Saqeeba)
 
@@ -640,3 +640,31 @@ What I learned: This is the same class of problem noted on earlier days. When a 
 - Reviewing my own new code before asking for review caught two real issues before they reached anyone else: a missing React import for the form event type, and a hand rolled numeric cache key for the data fetch that could in theory collide, replaced with the same string template key pattern used elsewhere in the app.
 - Manually testing with a real customer account end to end, submit a ticket, see it in the list, open its detail page, trigger the empty-form validation, confirmed the whole flow works, not just that it compiles.
 - Verified the backend side directly in Swagger as a customer: creating a ticket, listing only that customer's own tickets, and getting a 404 for a ticket that belongs to someone else. No backend changes were needed for this issue, since tenant isolation and the existing endpoints already covered it from Week 1.
+## Day 13 (Saqeeba)
+
+### Issue #60 follow-up, review bugs found by Ayesha
+
+### What I did
+- Ayesha found that percent and underscore characters in the search term were not escaped, so they acted as SQL LIKE wildcards instead of literal characters. Fixed by escaping backslash, percent, and underscore in the search term before building the pattern, and passing escape backslash to ilike.
+- Added tests for a literal percent in the term, a bare percent not matching everything, a bare underscore not matching everything, and an underscore matching only a literal underscore.
+- Ayesha also found that LEARNINGS.md had been corrupted by an earlier PowerShell command: a byte order mark at the start of the file, and garbled em dashes and en dashes turned into mojibake characters. Fixed by reading the raw bytes, removing the byte order mark, replacing the corrupted sequences with the correct dash characters, and writing the file back as UTF-8 without a byte order mark.
+- Strengthened three weak tests Ayesha flagged: the no-search test now checks the total count, not just the status code; the status-filter test now actually changes a ticket's status and proves a non-matching status is excluded; the other-org test now creates a matching ticket in both companies to prove isolation instead of relying on there being nothing to match.
+- Trimmed whitespace-only search terms so a single space is treated the same as no search at all, instead of matching almost every ticket.
+
+### Problem: PowerShell Add-Content and Set-Content corrupt special characters
+Found by: Ayesha (PR review)
+What happened: Writing text that includes an em dash or en dash with PowerShell's Add-Content or Set-Content can save the file with the wrong encoding, turning those characters into multi-character garbage and sometimes adding a byte order mark at the start of the file.
+How I fixed it: Read the file as raw bytes with System dot IO dot File ReadAllBytes, decode as UTF-8, remove the byte order mark if present, fix the corrupted character sequences, then write back with System dot IO dot File WriteAllText using a UTF8Encoding set to not emit a byte order mark.
+What I learned: When editing a shared text file from PowerShell, avoid typing em dashes, en dashes, or curly quotes directly in the content, since the default encoding PowerShell uses for Add-Content does not round-trip them safely. Plain ASCII punctuation avoids the problem entirely.
+
+### Issue #61, reports dashboard
+
+### What I did
+- Added GET /reports/tickets-per-day, which counts tickets created per day for the user's own company, grouped by day, with optional date_from and date_to filters.
+- Added GET /reports/avg-first-response, which averages the hours between created_at and first_response_at for tickets that have received a reply, again scoped to the company and the optional date range.
+- Both endpoints are staff only, reusing the same STAFF_ROLES permission check used elsewhere.
+- Wrote tests/test_reports.py covering permissions, tenant isolation, date range edge cases such as an inclusive end date and an open-ended start date, invalid date format returning 422, and the date_from after date_to case returning 400.
+- Built the /reports page on the frontend: a bar chart for tickets per day and a card showing the average first response time, both driven by the same two date filter inputs, with empty states for no data and a clear error message when the date range is invalid.
+
+### Learned
+- Writing a comprehensive set of tests before asking for review, based on the exact kinds of edge cases a previous review already caught, is worth doing up front rather than waiting for someone else to find the gaps.

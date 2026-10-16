@@ -3,6 +3,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./layout/Layout";
 import AcceptInvite from "./pages/AcceptInvite";
 import AuditLog from "./pages/AuditLog";
+import CustomerPortal from "./pages/CustomerPortal";
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -25,7 +26,7 @@ export default function App() {
           <Route index element={<Navigate to="/tickets" replace />} />
           <Route path="/tickets" element={<TicketList />} />
           <Route path="/tickets/:id" element={<TicketDetail />} />
-          <Route path="/portal" element={<Placeholder title="My tickets" />} />
+          <Route path="/portal" element={<CustomerPortal />} />
           <Route path="/settings" element={<Placeholder title="Settings" />} />
           <Route path="/settings/team" element={<Placeholder title="Team" />} />
           <Route path="/audit-log" element={<AuditLog />} />

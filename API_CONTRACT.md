@@ -1,4 +1,3 @@
-````markdown
 # API Contract — Helpdesk Platform
 
 This document defines what each member needs from the other so both sides can build
@@ -475,5 +474,22 @@ Adds case-insensitive, partial-match search over tickets.
 - Matches against both subject and description
 - Combines with existing filters: status, priority, assignee_id
 - Omit the parameter to get all tickets as before (unchanged behavior)
-- Example: `GET /tickets?search=order&status=open` returns only open tickets whose subject or description contains "order"
-````
+
+- Example: GET /tickets?search=order&status=open returns only open tickets whose subject or description contains order
+
+## Reports (Issue #61)
+
+### GET /reports/tickets-per-day
+Returns the count of tickets created per day, for the user's own company.
+- Response: {"items": [{"day": "2026-10-15", "count": 3}, ...]}
+- Optional filters: date_from, date_to (both YYYY-MM-DD, whole days in UTC, date_to is inclusive)
+- Staff only (agent, admin, owner). Customers get 403.
+- Error: 400 if date_from is after date_to; 422 if a date is not in YYYY-MM-DD format
+
+### GET /reports/avg-first-response
+Returns the average time between a ticket being created and its first reply, for the user's own company.
+- Response: {"average_hours": 3.5, "ticket_count": 12}
+- Tickets with no first_response_at yet are excluded from the average
+- average_hours is null and ticket_count is 0 when no tickets match
+- Optional filters: date_from, date_to (same rules as tickets-per-day, filtered by the ticket's created_at)
+- Staff only (agent, admin, owner). Customers get 403.

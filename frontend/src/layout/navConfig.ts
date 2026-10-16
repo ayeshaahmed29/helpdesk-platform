@@ -13,4 +13,5 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Team", path: "/settings/team", roles: ["admin", "owner"] },
   { label: "Settings", path: "/settings", roles: ["admin", "owner"], end: true },
   { label: "Audit log", path: "/audit-log", roles: ["admin", "owner"] },
+  { label: "Reports", path: "/reports", roles: ["agent", "admin", "owner"] },
 ];

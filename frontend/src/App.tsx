@@ -3,6 +3,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./layout/Layout";
 import AcceptInvite from "./pages/AcceptInvite";
 import AuditLog from "./pages/AuditLog";
+import ReportsDashboard from "./pages/ReportsDashboard";
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/settings" element={<Placeholder title="Settings" />} />
           <Route path="/settings/team" element={<Placeholder title="Team" />} />
           <Route path="/audit-log" element={<AuditLog />} />
+          <Route path="/reports" element={<ReportsDashboard />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFound />} />

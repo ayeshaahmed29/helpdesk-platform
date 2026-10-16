@@ -15,6 +15,8 @@ type Result = {
   error?: string;
 };
 
+const MAX_BAR_PX = 120;
+
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 400) return "The start date must not be after the end date.";
@@ -121,13 +123,15 @@ export default function ReportsDashboard() {
                 {ticketsPerDay?.items.map((item) => (
                   <div
                     key={item.day}
-                    className="flex flex-1 flex-col items-center justify-end gap-1"
+                    className="flex h-full flex-1 flex-col items-center justify-end gap-1"
                     title={`${item.day}: ${item.count} ticket${item.count === 1 ? "" : "s"}`}
                   >
                     <span className="text-xs text-gray-600">{item.count}</span>
                     <div
                       className="w-full rounded-t bg-blue-500"
-                      style={{ height: `${(item.count / chartMax) * 100}%` }}
+                      style={{
+                        height: `${Math.max(4, Math.round((item.count / chartMax) * MAX_BAR_PX))}px`,
+                      }}
                     />
                     <span className="w-full truncate text-center text-[10px] text-gray-500">
                       {item.day.slice(5)}

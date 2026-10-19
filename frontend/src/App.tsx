@@ -1,9 +1,10 @@
-﻿import { Navigate, Route, Routes } from "react-router-dom";
+﻿import { Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./layout/Layout";
 import AcceptInvite from "./pages/AcceptInvite";
 import AuditLog from "./pages/AuditLog";
 import CustomerPortal from "./pages/CustomerPortal";
+import HomeRedirect from "./pages/HomeRedirect";
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -25,7 +26,7 @@ export default function App() {
       <Route path="/accept-invite/:token" element={<AcceptInvite />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route index element={<Navigate to="/tickets" replace />} />
+          <Route index element={<HomeRedirect />} />
           <Route path="/tickets" element={<TicketList />} />
           <Route path="/tickets/:id" element={<TicketDetail />} />
           <Route path="/portal" element={<CustomerPortal />} />

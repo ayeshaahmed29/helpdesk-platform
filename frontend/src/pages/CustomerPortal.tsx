@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
+import { useAuth } from "../auth/useAuth";
 import {
   createTicket,
   listTickets,
@@ -34,6 +35,7 @@ function submitErrorMessage(err: unknown): string {
 }
 
 export default function CustomerPortal() {
+  const { user } = useAuth();
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -66,7 +68,11 @@ export default function CustomerPortal() {
   const listError = isCurrent ? result.error : undefined;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
-   async function handleSubmit(e: FormEvent) {
+  if (user && user.role !== "customer") {
+    return <Navigate to="/tickets" replace />;
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
